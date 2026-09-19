@@ -752,6 +752,7 @@
       if (state.onGround) {
         state.velocityY = CONFIG.jumpSpeed;
         state.onGround = false;
+        // Прыжки не тратят стамину
       }
       return;
     }

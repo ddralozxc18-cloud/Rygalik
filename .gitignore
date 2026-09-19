@@ -1,13 +1,14 @@
 ```gitignore
-# Compiled and build artifacts
+# Compiled and binary files
 *.pyc
 __pycache__/
+*.class
 *.o
-*.obj
 *.exe
 *.dll
 *.so
-*.class
+*.a
+*.obj
 *.out
 
 # Dependencies
@@ -16,17 +17,24 @@ venv/
 .venv/
 .env
 .env.local
-*.env.*
+.env.*
 
-# Logs and temp files
+# Build artifacts
+dist/
+build/
+target/
+
+# Logs and temporary files
 *.log
 *.tmp
 *.swp
 *.swo
 
-# Editors
+# Editor/IDE files
 .vscode/
 .idea/
+*.swp
+*.swo
 
 # System files
 .DS_Store
@@ -36,6 +44,15 @@ Thumbs.db
 coverage/
 htmlcov/
 .coverage
+
+# Python specific
+*.pyc
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+
+# Gradle
+.gradle/
 
 # Compressed files
 *.zip
