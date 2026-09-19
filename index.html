@@ -71,20 +71,30 @@
     <div id="crosshair"><span></span><span></span></div>
 
     <div id="stats-panel">
-      <div class="bar-row">
-        <span class="bar-icon hp-icon">♥</span>
-        <div class="bar-track"><div id="hp-fill" class="bar-fill hp-fill"></div></div>
-        <span class="bar-value" id="hp-value">100/100</span>
+      <div id="level-row">
+        <span class="level-label">Уровень <span id="level-value">1</span></span>
+        <div class="xp-track"><div id="xp-fill" class="xp-fill"></div></div>
       </div>
-      <div class="bar-row">
-        <span class="bar-icon mana-icon">✦</span>
-        <div class="bar-track"><div id="mana-fill" class="bar-fill mana-fill"></div></div>
-        <span class="bar-value" id="mana-value">100/100</span>
-      </div>
-      <div class="bar-row">
-        <span class="bar-icon stamina-icon">⚡</span>
-        <div class="bar-track"><div id="stamina-fill" class="bar-fill stamina-fill"></div></div>
-        <span class="bar-value" id="stamina-value">100/100</span>
+      
+      <div class="stats-container">
+        <div class="bar-row">
+          <span class="bar-icon hp-icon">♥</span>
+          <div class="bar-track"><div id="hp-fill" class="bar-fill hp-fill"></div></div>
+          <span class="bar-value" id="hp-value">100/100</span>
+          <span class="regen-value" id="hp-regen">+0/сек</span>
+        </div>
+        <div class="bar-row">
+          <span class="bar-icon mana-icon">✦</span>
+          <div class="bar-track"><div id="mana-fill" class="bar-fill mana-fill"></div></div>
+          <span class="bar-value" id="mana-value">100/100</span>
+          <span class="regen-value" id="mana-regen">+0/сек</span>
+        </div>
+        <div class="bar-row">
+          <span class="bar-icon stamina-icon">⚡</span>
+          <div class="bar-track"><div id="stamina-fill" class="bar-fill stamina-fill"></div></div>
+          <span class="bar-value" id="stamina-value">100/100</span>
+          <span class="regen-value" id="stamina-regen">+0/сек</span>
+        </div>
       </div>
     </div>
 

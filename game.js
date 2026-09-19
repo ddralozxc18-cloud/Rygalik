@@ -55,6 +55,10 @@
     mana: 100, maxMana: 100,
     stamina: 100, maxStamina: 100,
 
+    level: 1,
+    xp: 0,
+    xpToNextLevel: 100,
+
     lastStaminaUseTime: -999,
     lastDamageTime: -999,
 
@@ -109,11 +113,16 @@
 
   const hpFillEl = document.getElementById('hp-fill');
   const hpValueEl = document.getElementById('hp-value');
+  const hpRegenEl = document.getElementById('hp-regen');
   const manaFillEl = document.getElementById('mana-fill');
   const manaValueEl = document.getElementById('mana-value');
+  const manaRegenEl = document.getElementById('mana-regen');
   const staminaFillEl = document.getElementById('stamina-fill');
   const staminaValueEl = document.getElementById('stamina-value');
+  const staminaRegenEl = document.getElementById('stamina-regen');
   const gemCountEl = document.getElementById('gem-count');
+  const levelValueEl = document.getElementById('level-value');
+  const xpFillEl = document.getElementById('xp-fill');
 
   const pickupPromptEl = document.getElementById('pickup-prompt');
   const inventoryGridEl = document.getElementById('inventory-grid');
@@ -346,6 +355,9 @@
     staminaValueEl.textContent = Math.ceil(state.stamina) + '/' + state.maxStamina;
 
     gemCountEl.textContent = state.gems;
+
+    levelValueEl.textContent = state.level;
+    xpFillEl.style.width = (state.xp / state.xpToNextLevel * 100) + '%';
   }
 
   function updateFpsCounter(dt) {
@@ -377,8 +389,29 @@
     const def = ITEM_DEFS[id];
     if (!state.inventory[id]) state.inventory[id] = { def, count: 0 };
     state.inventory[id].count++;
-    if (id === 'gem') state.gems++;
+    if (id === 'gem') {
+      state.gems++;
+      addXp(10);
+    } else {
+      addXp(5);
+    }
     renderInventoryGrid();
+  }
+
+  function addXp(amount) {
+    state.xp += amount;
+    if (state.xp >= state.xpToNextLevel) {
+      state.xp -= state.xpToNextLevel;
+      state.level++;
+      state.xpToNextLevel = Math.floor(state.xpToNextLevel * 1.5);
+      state.maxHp += 20;
+      state.hp = state.maxHp;
+      state.maxMana += 15;
+      state.mana = state.maxMana;
+      state.maxStamina += 15;
+      state.stamina = state.maxStamina;
+    }
+    updateHUD();
   }
 
   function useItem(id) {
@@ -540,6 +573,15 @@
       state.hp = Math.min(state.maxHp, state.hp + CONFIG.hpRegenRate * dt);
     }
 
+    // Обновление показателей восстановления в HUD
+    const staminaRegenDisplay = (elapsed - state.lastStaminaUseTime > CONFIG.staminaRegenDelay && !isRunning) ? CONFIG.staminaRegenRate : 0;
+    const hpRegenDisplay = (elapsed - state.lastDamageTime > CONFIG.hpRegenDelay) ? CONFIG.hpRegenRate : 0;
+    const manaRegenDisplay = CONFIG.manaRegenRate;
+    
+    hpRegenEl.textContent = '+' + hpRegenDisplay.toFixed(1) + '/сек';
+    manaRegenEl.textContent = '+' + manaRegenDisplay.toFixed(1) + '/сек';
+    staminaRegenEl.textContent = '+' + staminaRegenDisplay.toFixed(1) + '/сек';
+
     // Вертикальная физика (гравитация и прыжок)
     state.velocityY += CONFIG.gravity * dt;
     let newY = camera.position.y - state.bobOffset + state.velocityY * dt;
@@ -619,9 +661,15 @@
   }
 
   function fullReset() {
-    state.hp = state.maxHp;
-    state.mana = state.maxMana;
-    state.stamina = state.maxStamina;
+    state.hp = 100;
+    state.maxHp = 100;
+    state.mana = 100;
+    state.maxMana = 100;
+    state.stamina = 100;
+    state.maxStamina = 100;
+    state.level = 1;
+    state.xp = 0;
+    state.xpToNextLevel = 100;
     state.inventory = {};
     state.gems = 0;
     state.lastDamageTime = -999;
@@ -701,11 +749,9 @@
 
     if (e.code === 'Space') {
       e.preventDefault();
-      if (state.onGround && state.stamina >= CONFIG.jumpStaminaCost) {
+      if (state.onGround) {
         state.velocityY = CONFIG.jumpSpeed;
         state.onGround = false;
-        state.stamina = Math.max(0, state.stamina - CONFIG.jumpStaminaCost);
-        state.lastStaminaUseTime = clock.getElapsedTime();
       }
       return;
     }
