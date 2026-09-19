@@ -13,7 +13,7 @@
     eyeHeight: 1.7,
     gravity: -22,
     jumpSpeed: 8,
-    jumpStaminaCost: 10,
+    jumpStaminaCost: 0, // Прыжки больше не тратят стамину
 
     walkSpeed: 4.2,
     runSpeed: 8.6,
@@ -140,6 +140,15 @@
   let fpsAccum = 0, fpsFrames = 0, fpsTimer = 0;
 
   // ---------------------------------------------------------
+  // Звуки ходьбы
+  // ---------------------------------------------------------
+  let walkSound1 = null;
+  let walkSound2 = null;
+  let walkSoundCurrent = null;
+  let lastFootstepTime = 0;
+  let footstepInterval = 0.5; // Интервал между шагами (будет меняться от скорости)
+
+  // ---------------------------------------------------------
   // Инициализация сцены, освещения и рендера
   // ---------------------------------------------------------
   function initScene() {
@@ -175,6 +184,18 @@
     scene.add(sun);
 
     clock = new THREE.Clock();
+
+    // Загрузка звуков ходьбы
+    try {
+      walkSound1 = new Audio('sounds/walk1.mp3');
+      walkSound2 = new Audio('sounds/walk2.mp3');
+      walkSound1.volume = 0.4;
+      walkSound2.volume = 0.4;
+      walkSound1.loop = false;
+      walkSound2.loop = false;
+    } catch (e) {
+      console.warn('Звуки ходьбы не загружены:', e);
+    }
   }
 
   // ---------------------------------------------------------
@@ -603,6 +624,13 @@
     if (state.onGround && isMoving) {
       state.bobTimer += dt * (isRunning ? 13 : 8.4);
       state.bobOffset = Math.sin(state.bobTimer) * (isRunning ? 0.085 : 0.05);
+      
+      // Воспроизведение звуков шагов
+      const stepInterval = isRunning ? 0.25 : 0.5; // При беге шаги чаще
+      if (elapsed - lastFootstepTime > stepInterval) {
+        lastFootstepTime = elapsed;
+        playFootstep();
+      }
     } else {
       state.bobOffset += (0 - state.bobOffset) * Math.min(1, dt * 8);
     }
@@ -621,6 +649,23 @@
   // ---------------------------------------------------------
   // Управление состояниями игры
   // ---------------------------------------------------------
+  function playFootstep() {
+    if (!walkSound1 || !walkSound2) return;
+    
+    // Останавливаем текущий звук
+    if (walkSoundCurrent && !walkSoundCurrent.paused) {
+      walkSoundCurrent.pause();
+      walkSoundCurrent.currentTime = 0;
+    }
+    
+    // Выбираем следующий звук (чередование)
+    walkSoundCurrent = (walkSoundCurrent === walkSound1) ? walkSound2 : walkSound1;
+    
+    // Сбрасываем и воспроизводим
+    walkSoundCurrent.currentTime = 0;
+    walkSoundCurrent.play().catch(() => {});
+  }
+
   function resetPlayerPosition() {
     camera.position.set(0, CONFIG.eyeHeight, 6);
     camera.rotation.set(0, 0, 0);
