@@ -118,6 +118,9 @@
   const inventoryGridEl = document.getElementById('inventory-grid');
   const damageVignetteEl = document.getElementById('damage-vignette');
   const fpsCounterEl = document.getElementById('fps-counter');
+  const cheatConsoleEl = document.getElementById('cheat-console');
+  const consoleInputEl = document.getElementById('console-input');
+  const consoleOutputEl = document.getElementById('console-output');
 
   // ---------------------------------------------------------
   // Three.js — глобальные объекты сцены
@@ -126,8 +129,14 @@
   const collectibles = [];
   const obstacles = [];
   const flares = [];
+  const targets = []; // Массив мишеней bob/superbob
   let damageFlashTimeout = null;
   let fpsAccum = 0, fpsFrames = 0, fpsTimer = 0;
+
+  // ---------------------------------------------------------
+  // Cheat Console State
+  // ---------------------------------------------------------
+  let cheatConsoleOpen = false;
 
   // ---------------------------------------------------------
   // Звуки ходьбы
@@ -732,6 +741,28 @@
     if (e.button === 2 && document.pointerLockElement === container && isActive()) {
       castFlare();
     }
+    
+    // Check for target hit on left click (button 0)
+    if (e.button === 0 && document.pointerLockElement === container && isActive() && targets.length > 0) {
+      checkTargetHit();
+    }
+  }
+
+  function checkTargetHit() {
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    
+    const targetMeshes = targets.map(t => t.mesh);
+    const intersects = raycaster.intersectObjects(targetMeshes);
+    
+    if (intersects.length > 0) {
+      const hitMesh = intersects[0].object;
+      const target = targets.find(t => t.mesh === hitMesh);
+      if (target) {
+        // Deal damage (e.g., 25 damage per hit)
+        applyDamageToTarget(target, 25);
+      }
+    }
   }
 
   function onPointerLockChange() {
@@ -748,6 +779,29 @@
   }
 
   function onKeyDown(e) {
+    // Cheat console toggle with Backquote (`~`)
+    if (e.code === 'Backquote') {
+      e.preventDefault();
+      toggleCheatConsole();
+      return;
+    }
+
+    // Handle input when cheat console is open
+    if (cheatConsoleOpen) {
+      if (e.code === 'Enter') {
+        e.preventDefault();
+        executeCheatCommand(consoleInputEl.value);
+        consoleInputEl.value = '';
+        return;
+      }
+      if (e.code === 'Escape') {
+        e.preventDefault();
+        closeCheatConsole();
+        return;
+      }
+      return; // Block other keys when console is open
+    }
+
     if (e.code === 'KeyI') {
       e.preventDefault();
       if (state.inventoryOpen) { toggleInventory(); }
@@ -826,8 +880,349 @@
       updateHUD();
     }
 
+    // Update HP bars for targets
+    if (targets.length > 0) {
+      updateHPBars();
+    }
+
     updateFpsCounter(dt);
     renderer.render(scene, camera);
+  }
+
+  // ---------------------------------------------------------
+  // Cheat Console Functions
+  // ---------------------------------------------------------
+  function toggleCheatConsole() {
+    cheatConsoleOpen = !cheatConsoleOpen;
+    if (cheatConsoleOpen) {
+      cheatConsoleEl.classList.remove('hidden');
+      consoleInputEl.focus();
+      document.exitPointerLock();
+    } else {
+      closeCheatConsole();
+    }
+  }
+
+  function closeCheatConsole() {
+    cheatConsoleOpen = false;
+    cheatConsoleEl.classList.add('hidden');
+    consoleInputEl.value = '';
+    container.requestPointerLock();
+  }
+
+  function logToConsole(message, type = 'info') {
+    const entry = document.createElement('div');
+    entry.className = 'log-entry ' + type;
+    entry.textContent = '> ' + message;
+    consoleOutputEl.appendChild(entry);
+    consoleOutputEl.scrollTop = consoleOutputEl.scrollHeight;
+    
+    // Auto-remove old entries after some time
+    setTimeout(() => {
+      entry.remove();
+    }, 5000);
+  }
+
+  function executeCheatCommand(cmd) {
+    const trimmedCmd = cmd.trim().toLowerCase();
+    if (!trimmedCmd) return;
+
+    logToConsole(trimmedCmd, 'info');
+
+    // Parse command and arguments
+    const parts = trimmedCmd.split(/\s+/);
+    const command = parts[0];
+    const args = parts.slice(1);
+
+    try {
+      switch (command) {
+        case 'lvlup': {
+          const levels = parseInt(args[0], 10) || 1;
+          for (let i = 0; i < levels; i++) {
+            state.xp += state.xpToNextLevel;
+            if (state.xp >= state.xpToNextLevel) {
+              state.xp -= state.xpToNextLevel;
+              state.level++;
+              state.xpToNextLevel = Math.floor(state.xpToNextLevel * 1.5);
+              state.maxHp += 20;
+              state.hp = state.maxHp;
+              state.maxMana += 15;
+              state.mana = state.maxMana;
+            }
+          }
+          updateHUD();
+          logToConsole(`Повышен уровень на ${levels}. Текущий уровень: ${state.level}`, 'success');
+          break;
+        }
+
+        case 'spawn_bob': {
+          spawnTarget('bob');
+          logToConsole('Создан Bob (HP: 100, Regen: 2, Mana: 100, ManaRegen: 2)', 'success');
+          break;
+        }
+
+        case 'spawn_superbob': {
+          spawnTarget('superbob');
+          logToConsole('Создан SuperBob (бессмертный)', 'success');
+          break;
+        }
+
+        case 'delall_bob': {
+          let count = targets.length;
+          for (const target of targets) {
+            scene.remove(target.mesh);
+            if (target.hpBarGroup) scene.remove(target.hpBarGroup);
+            // Remove damage numbers
+            if (target.damageNumbers) {
+              for (const dn of target.damageNumbers) {
+                scene.remove(dn.mesh);
+              }
+            }
+          }
+          targets.length = 0;
+          logToConsole(`Удалено мишеней: ${count}`, 'success');
+          break;
+        }
+
+        case 'rhp': {
+          state.hp = state.maxHp;
+          updateHUD();
+          logToConsole('Здоровье восстановлено до максимума', 'success');
+          break;
+        }
+
+        case 'rmn': {
+          state.mana = state.maxMana;
+          updateHUD();
+          logToConsole('Мана восстановлена до максимума', 'success');
+          break;
+        }
+
+        case 'rst': {
+          state.hp = state.maxHp;
+          state.mana = state.maxMana;
+          updateHUD();
+          logToConsole('Здоровье и мана восстановлены до максимума', 'success');
+          break;
+        }
+
+        default:
+          logToConsole(`Неизвестная команда: ${command}`, 'error');
+      }
+    } catch (err) {
+      logToConsole(`Ошибка: ${err.message}`, 'error');
+    }
+  }
+
+  function spawnTarget(type) {
+    // Get player position and direction
+    const playerPos = camera.position.clone();
+    const playerDir = new THREE.Vector3();
+    camera.getWorldDirection(playerDir);
+    
+    // Spawn 3 units in front of player
+    const spawnPos = playerPos.clone().add(playerDir.multiplyScalar(3));
+    spawnPos.y = 1.5; // Height of target
+
+    const isSuperBob = type === 'superbob';
+    
+    // Create target mesh
+    const geometry = new THREE.BoxGeometry(1, 2, 0.5);
+    const material = new THREE.MeshStandardMaterial({ 
+      color: isSuperBob ? 0xff00ff : 0xff4444,
+      flatShading: true
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.copy(spawnPos);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+
+    // Create HP bar above target
+    const hpBarGroup = createHPBar(isSuperBob ? '∞' : '100/100');
+    hpBarGroup.position.copy(spawnPos);
+    hpBarGroup.position.y += 2.5;
+    scene.add(hpBarGroup);
+
+    // Target object
+    const target = {
+      type: type,
+      mesh: mesh,
+      hpBarGroup: hpBarGroup,
+      hp: 100,
+      maxHp: 100,
+      hpRegen: 2,
+      mana: 100,
+      maxMana: 100,
+      manaRegen: 2,
+      isImmortal: isSuperBob,
+      lastRegenTime: 0,
+      damageNumbers: []
+    };
+
+    targets.push(target);
+  }
+
+  function createHPBar(text) {
+    const group = new THREE.Group();
+    
+    // Background
+    const bgGeo = new THREE.PlaneGeometry(2, 0.3);
+    const bgMat = new THREE.MeshBasicMaterial({ color: 0x000000, opacity: 0.7, transparent: true });
+    const bg = new THREE.Mesh(bgGeo, bgMat);
+    group.add(bg);
+
+    // HP fill
+    const fillGeo = new THREE.PlaneGeometry(1.9, 0.25);
+    const fillMat = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    const fill = new THREE.Mesh(fillGeo, fillMat);
+    fill.position.x = -0.05;
+    fill.name = 'hpFill';
+    group.add(fill);
+
+    // Text label (using a simple approach - in real implementation you'd use canvas texture)
+    const textGeo = new THREE.PlaneGeometry(1.5, 0.4);
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 32px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(text, 128, 44);
+    const textTexture = new THREE.CanvasTexture(canvas);
+    const textMat = new THREE.MeshBasicMaterial({ map: textTexture, transparent: true });
+    const textMesh = new THREE.Mesh(textGeo, textMat);
+    textMesh.position.y = 0.4;
+    textMesh.name = 'hpText';
+    group.add(textMesh);
+
+    // Make bars always face camera
+    group.userData = { 
+      isHPBar: true, 
+      hpFill: fill, 
+      hpText: textMesh,
+      originalText: text 
+    };
+
+    return group;
+  }
+
+  function updateHPBars() {
+    for (const target of targets) {
+      // Make HP bar face camera
+      target.hpBarGroup.lookAt(camera.position);
+      target.hpBarGroup.position.copy(target.mesh.position);
+      target.hpBarGroup.position.y += 2.5;
+
+      // Update HP bar fill
+      const hpFill = target.hpBarGroup.userData.hpFill;
+      const hpPercent = target.hp / target.maxHp;
+      hpFill.scale.x = hpPercent;
+      hpFill.position.x = (hpPercent - 1) * 0.95;
+
+      // Update text
+      const hpText = target.hpBarGroup.userData.hpText;
+      const canvas = hpText.material.map.image;
+      const ctx = canvas.getContext('2d');
+      const text = target.isImmortal ? '∞' : `${Math.ceil(target.hp)}/${target.maxHp}`;
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 32px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(text, 128, 44);
+      hpText.material.map.needsUpdate = true;
+
+      // Regen
+      const now = clock.getElapsedTime();
+      if (now - target.lastRegenTime >= 1 && target.hp < target.maxHp) {
+        target.hp = Math.min(target.maxHp, target.hp + target.hpRegen);
+        target.mana = Math.min(target.maxMana, target.mana + target.manaRegen);
+        target.lastRegenTime = now;
+      }
+
+      // Update damage numbers
+      updateDamageNumbers(target, now);
+    }
+  }
+
+  function showDamageNumber(target, amount) {
+    const geometry = new THREE.TextGeometry ? 
+      new THREE.TextGeometry(amount.toString(), { size: 0.5, height: 0.1 }) :
+      new THREE.PlaneGeometry(0.5, 0.5);
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ff0000';
+    ctx.font = 'bold 40px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(amount.toString(), 64, 48);
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.MeshBasicMaterial({ 
+      map: texture, 
+      transparent: true,
+      depthTest: false,
+      depthWrite: false
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.copy(target.mesh.position);
+    mesh.position.y += 1.5;
+    scene.add(mesh);
+
+    target.damageNumbers.push({
+      mesh: mesh,
+      amount: amount,
+      birthTime: clock.getElapsedTime(),
+      lifetime: 1.5
+    });
+  }
+
+  function updateDamageNumbers(target, now) {
+    for (let i = target.damageNumbers.length - 1; i >= 0; i--) {
+      const dn = target.damageNumbers[i];
+      const age = now - dn.birthTime;
+      
+      if (age >= dn.lifetime) {
+        scene.remove(dn.mesh);
+        target.damageNumbers.splice(i, 1);
+        continue;
+      }
+
+      // Move up and fade
+      dn.mesh.position.y += 0.02;
+      const opacity = 1 - (age / dn.lifetime);
+      dn.mesh.material.opacity = opacity;
+    }
+  }
+
+  function applyDamageToTarget(target, amount) {
+    if (!target) return;
+    
+    if (target.isImmortal) {
+      showDamageNumber(target, amount);
+      return;
+    }
+
+    target.hp = Math.max(0, target.hp - amount);
+    showDamageNumber(target, amount);
+
+    if (target.hp <= 0) {
+      // Target destroyed
+      const index = targets.indexOf(target);
+      if (index > -1) {
+        targets.splice(index, 1);
+      }
+      scene.remove(target.mesh);
+      scene.remove(target.hpBarGroup);
+      
+      // Clean up damage numbers
+      for (const dn of target.damageNumbers) {
+        scene.remove(dn.mesh);
+      }
+    }
   }
 
   // ---------------------------------------------------------
