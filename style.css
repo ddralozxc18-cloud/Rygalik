@@ -87,6 +87,12 @@ html, body{
 .menu-card::-webkit-scrollbar{ width: 6px; }
 .menu-card::-webkit-scrollbar-thumb{ background: var(--panel-border); border-radius: 3px; }
 
+.sunser-title{
+  font-size: 56px;
+  letter-spacing: 0.15em;
+  margin-bottom: 4px;
+}
+
 .menu-eyebrow{
   margin: 0 0 6px;
   font-size: 12.5px;

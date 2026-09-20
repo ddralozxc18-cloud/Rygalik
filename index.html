@@ -17,15 +17,16 @@
   <!-- ===== Главное меню ===== -->
   <div id="menu-screen" class="screen">
     <div class="menu-card">
+      <h1 class="menu-title sunser-title">SUNSER</h1>
       <p class="menu-eyebrow">бродилка от первого лица</p>
-      <h1 class="menu-title">ПУСТОШИ</h1>
       <p class="menu-subtitle">Низкополигональные земли ждут своего скитальца</p>
 
+      <button id="start-btn" class="btn-primary">НАЧАТЬ ИГРУ</button>
+      
       <div class="menu-controls">
         <h2>Управление</h2>
         <ul>
           <li><span class="key">W A S D</span><span class="key-desc">движение</span></li>
-          <li><span class="key">Shift</span><span class="key-desc">бег — тратит выносливость</span></li>
           <li><span class="key">Space</span><span class="key-desc">прыжок</span></li>
           <li><span class="key">ПКМ</span><span class="key-desc">вспышка — тратит ману</span></li>
           <li><span class="key">E</span><span class="key-desc">поднять предмет</span></li>
@@ -39,7 +40,6 @@
         <input type="range" id="sensitivity-slider" min="0.3" max="3" step="0.1" value="1">
       </label>
 
-      <button id="start-btn" class="btn-primary">Начать игру</button>
       <p class="menu-footnote">Клик по кнопке захватит курсор мыши для обзора</p>
     </div>
   </div>
@@ -88,12 +88,6 @@
           <div class="bar-track"><div id="mana-fill" class="bar-fill mana-fill"></div></div>
           <span class="bar-value" id="mana-value">100/100</span>
           <span class="regen-value" id="mana-regen">+0/сек</span>
-        </div>
-        <div class="bar-row">
-          <span class="bar-icon stamina-icon">⚡</span>
-          <div class="bar-track"><div id="stamina-fill" class="bar-fill stamina-fill"></div></div>
-          <span class="bar-value" id="stamina-value">100/100</span>
-          <span class="regen-value" id="stamina-regen">+0/сек</span>
         </div>
       </div>
     </div>
