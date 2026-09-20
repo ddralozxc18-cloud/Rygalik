@@ -512,6 +512,67 @@ html, body{
   pointer-events: none;
 }
 
+/* ===== Cheat Console Styles ===== */
+#cheat-console {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10, 12, 17, 0.95);
+  border-bottom: 2px solid var(--gold);
+  padding: 10px 20px;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+#console-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#console-prompt {
+  color: var(--gold-bright);
+  font-weight: bold;
+  font-size: 16px;
+}
+
+#console-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  padding: 5px 0;
+}
+
+#console-output {
+  margin-top: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+#console-output .log-entry {
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+#console-output .log-entry.success {
+  color: #86efac;
+}
+
+#console-output .log-entry.error {
+  color: #f87171;
+}
+
+#console-output .log-entry.info {
+  color: var(--gold-bright);
+}
+
 @media (max-width: 560px){
   #stats-panel{ width: 200px; left: 14px; bottom: 14px; }
   .menu-title{ font-size: 32px; }
