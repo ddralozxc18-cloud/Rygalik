@@ -742,8 +742,8 @@
       castFlare();
     }
     
-    // Check for target hit on left click (button 0)
-    if (e.button === 0 && document.pointerLockElement === container && isActive() && targets.length > 0) {
+    // Check for target hit on left click (button 0) - works even when cheat console is closed but game is active
+    if (e.button === 0 && targets.length > 0 && !cheatConsoleOpen) {
       checkTargetHit();
     }
   }
@@ -765,6 +765,9 @@
     }
   }
 
+  // Expose checkTargetHit globally for cheat console access
+  window.checkTargetHit = checkTargetHit;
+
   function onPointerLockChange() {
     const locked = document.pointerLockElement === container;
     if (locked) {
@@ -779,7 +782,7 @@
   }
 
   function onKeyDown(e) {
-    // Cheat console toggle with Backquote (`~`)
+    // Cheat console toggle with Backquote (`~`) - works regardless of game state
     if (e.code === 'Backquote') {
       e.preventDefault();
       toggleCheatConsole();
@@ -931,8 +934,29 @@
 
     // Parse command and arguments
     const parts = trimmedCmd.split(/\s+/);
-    const command = parts[0];
+    let command = parts[0];
     const args = parts.slice(1);
+
+    // Handle commands with underscore prefix like lvlup_12
+    if (command.startsWith('lvlup_')) {
+      const levelsStr = command.substring(6);
+      const levels = parseInt(levelsStr, 10) || 1;
+      for (let i = 0; i < levels; i++) {
+        state.xp += state.xpToNextLevel;
+        if (state.xp >= state.xpToNextLevel) {
+          state.xp -= state.xpToNextLevel;
+          state.level++;
+          state.xpToNextLevel = Math.floor(state.xpToNextLevel * 1.5);
+          state.maxHp += 20;
+          state.hp = state.maxHp;
+          state.maxMana += 15;
+          state.mana = state.maxMana;
+        }
+      }
+      updateHUD();
+      logToConsole(`Повышен уровень на ${levels}. Текущий уровень: ${state.level}`, 'success');
+      return;
+    }
 
     try {
       switch (command) {
@@ -1095,6 +1119,7 @@
     const textMesh = new THREE.Mesh(textGeo, textMat);
     textMesh.position.y = 0.4;
     textMesh.name = 'hpText';
+    textMesh.userData.currentText = text;
     group.add(textMesh);
 
     // Make bars always face camera
@@ -1121,18 +1146,21 @@
       hpFill.scale.x = hpPercent;
       hpFill.position.x = (hpPercent - 1) * 0.95;
 
-      // Update text
+      // Update text only when HP changes significantly to avoid lag
       const hpText = target.hpBarGroup.userData.hpText;
-      const canvas = hpText.material.map.image;
-      const ctx = canvas.getContext('2d');
-      const text = target.isImmortal ? '∞' : `${Math.ceil(target.hp)}/${target.maxHp}`;
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 32px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText(text, 128, 44);
-      hpText.material.map.needsUpdate = true;
+      const currentText = target.isImmortal ? '∞' : `${Math.ceil(target.hp)}/${target.maxHp}`;
+      if (hpText.userData.currentText !== currentText) {
+        const canvas = hpText.material.map.image;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 32px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(currentText, 128, 44);
+        hpText.material.map.needsUpdate = true;
+        hpText.userData.currentText = currentText;
+      }
 
       // Regen
       const now = clock.getElapsedTime();
