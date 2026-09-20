@@ -165,6 +165,7 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.sortObjects = true;
     container.appendChild(renderer.domElement);
 
     const hemi = new THREE.HemisphereLight(0xbfe0ff, 0x3f5a2e, 0.8);
@@ -1092,16 +1093,31 @@
     
     // Background - use sprite to always face camera
     const bgGeo = new THREE.PlaneGeometry(2, 0.3);
-    const bgMat = new THREE.MeshBasicMaterial({ color: 0x000000, opacity: 0.7, transparent: true, side: THREE.DoubleSide });
+    const bgMat = new THREE.MeshBasicMaterial({ 
+      color: 0x000000, 
+      opacity: 0.7, 
+      transparent: true, 
+      side: THREE.DoubleSide,
+      depthTest: false,
+      depthWrite: false
+    });
     const bg = new THREE.Mesh(bgGeo, bgMat);
+    bg.renderOrder = 999;
     bg.name = 'hpBg';
     group.add(bg);
 
     // HP fill
     const fillGeo = new THREE.PlaneGeometry(1.9, 0.25);
-    const fillMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide });
+    const fillMat = new THREE.MeshBasicMaterial({ 
+      color: 0x00ff00, 
+      side: THREE.DoubleSide,
+      depthTest: false,
+      depthWrite: false
+    });
     const fill = new THREE.Mesh(fillGeo, fillMat);
-    fill.position.set(-0.95, 0, 0.01); // Start at left edge
+    fill.position.set(-0.95, 0, 0.02); // Start at left edge, slightly in front of bg
+    fill.scale.set(1, 1, 1); // Initial scale
+    fill.renderOrder = 1000;
     fill.name = 'hpFill';
     group.add(fill);
 
@@ -1116,9 +1132,16 @@
     ctx.textAlign = 'center';
     ctx.fillText(text, 128, 44);
     const textTexture = new THREE.CanvasTexture(canvas);
-    const textMat = new THREE.MeshBasicMaterial({ map: textTexture, transparent: true, side: THREE.DoubleSide });
+    const textMat = new THREE.MeshBasicMaterial({ 
+      map: textTexture, 
+      transparent: true, 
+      side: THREE.DoubleSide,
+      depthTest: false,
+      depthWrite: false
+    });
     const textMesh = new THREE.Mesh(textGeo, textMat);
-    textMesh.position.set(0, 0.4, 0.02);
+    textMesh.position.set(0, 0.4, 0.03); // Slightly in front of fill
+    textMesh.renderOrder = 1001;
     textMesh.name = 'hpText';
     textMesh.userData.currentText = text;
     group.add(textMesh);
@@ -1149,7 +1172,10 @@
       // Update HP bar fill width based on HP percentage
       const hpFill = target.hpBarGroup.userData.hpFill;
       const hpPercent = target.hp / target.maxHp;
-      hpFill.scale.x = Math.max(0, hpPercent);
+      // Only update scale if it changed to prevent flickering
+      if (Math.abs(hpFill.scale.x - hpPercent) > 0.001) {
+        hpFill.scale.x = Math.max(0, hpPercent);
+      }
 
       // Update text only when HP changes
       const hpText = target.hpBarGroup.userData.hpText;
@@ -1181,10 +1207,6 @@
   }
 
   function showDamageNumber(target, amount) {
-    const geometry = new THREE.TextGeometry ? 
-      new THREE.TextGeometry(amount.toString(), { size: 0.5, height: 0.1 }) :
-      new THREE.PlaneGeometry(0.5, 0.5);
-    
     const canvas = document.createElement('canvas');
     canvas.width = 128;
     canvas.height = 64;
@@ -1198,11 +1220,14 @@
       map: texture, 
       transparent: true,
       depthTest: false,
-      depthWrite: false
+      depthWrite: false,
+      side: THREE.DoubleSide
     });
+    const geometry = new THREE.PlaneGeometry(0.8, 0.4);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.copy(target.mesh.position);
     mesh.position.y += 1.5;
+    mesh.renderOrder = 2000;
     scene.add(mesh);
 
     target.damageNumbers.push({
@@ -1220,12 +1245,15 @@
       
       if (age >= dn.lifetime) {
         scene.remove(dn.mesh);
+        dn.mesh.geometry.dispose();
+        dn.mesh.material.map.dispose();
+        dn.mesh.material.dispose();
         target.damageNumbers.splice(i, 1);
         continue;
       }
 
       // Move up and fade
-      dn.mesh.position.y += 0.02;
+      dn.mesh.position.y += 0.03;
       const opacity = 1 - (age / dn.lifetime);
       dn.mesh.material.opacity = opacity;
     }
