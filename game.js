@@ -541,7 +541,7 @@
   // Игрок: движение, физика, характеристики
   // ---------------------------------------------------------
   function isActive() {
-    return state.started && !state.paused && !state.inventoryOpen && !state.dead;
+    return state.started && !state.paused && !state.inventoryOpen && !state.dead && !cheatConsoleOpen;
   }
 
   function updatePlayer(dt, elapsed) {
@@ -943,7 +943,7 @@
       const levels = parseInt(levelsStr, 10) || 1;
       for (let i = 0; i < levels; i++) {
         state.xp += state.xpToNextLevel;
-        if (state.xp >= state.xpToNextLevel) {
+        while (state.xp >= state.xpToNextLevel) {
           state.xp -= state.xpToNextLevel;
           state.level++;
           state.xpToNextLevel = Math.floor(state.xpToNextLevel * 1.5);
@@ -1090,21 +1090,22 @@
   function createHPBar(text) {
     const group = new THREE.Group();
     
-    // Background
+    // Background - use sprite to always face camera
     const bgGeo = new THREE.PlaneGeometry(2, 0.3);
-    const bgMat = new THREE.MeshBasicMaterial({ color: 0x000000, opacity: 0.7, transparent: true });
+    const bgMat = new THREE.MeshBasicMaterial({ color: 0x000000, opacity: 0.7, transparent: true, side: THREE.DoubleSide });
     const bg = new THREE.Mesh(bgGeo, bgMat);
+    bg.name = 'hpBg';
     group.add(bg);
 
     // HP fill
     const fillGeo = new THREE.PlaneGeometry(1.9, 0.25);
-    const fillMat = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    const fillMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide });
     const fill = new THREE.Mesh(fillGeo, fillMat);
-    fill.position.x = -0.05;
+    fill.position.set(-0.95, 0, 0.01); // Start at left edge
     fill.name = 'hpFill';
     group.add(fill);
 
-    // Text label (using a simple approach - in real implementation you'd use canvas texture)
+    // Text label
     const textGeo = new THREE.PlaneGeometry(1.5, 0.4);
     const canvas = document.createElement('canvas');
     canvas.width = 256;
@@ -1115,19 +1116,19 @@
     ctx.textAlign = 'center';
     ctx.fillText(text, 128, 44);
     const textTexture = new THREE.CanvasTexture(canvas);
-    const textMat = new THREE.MeshBasicMaterial({ map: textTexture, transparent: true });
+    const textMat = new THREE.MeshBasicMaterial({ map: textTexture, transparent: true, side: THREE.DoubleSide });
     const textMesh = new THREE.Mesh(textGeo, textMat);
-    textMesh.position.y = 0.4;
+    textMesh.position.set(0, 0.4, 0.02);
     textMesh.name = 'hpText';
     textMesh.userData.currentText = text;
     group.add(textMesh);
 
-    // Make bars always face camera
+    // Store references for updates
     group.userData = { 
-      isHPBar: true, 
+      hpBg: bg,
       hpFill: fill, 
       hpText: textMesh,
-      originalText: text 
+      lastHpValue: text
     };
 
     return group;
@@ -1135,18 +1136,22 @@
 
   function updateHPBars() {
     for (const target of targets) {
-      // Make HP bar face camera
-      target.hpBarGroup.lookAt(camera.position);
+      // Position HP bar above target
       target.hpBarGroup.position.copy(target.mesh.position);
       target.hpBarGroup.position.y += 2.5;
+      
+      // Make HP bar face camera - rotate only around Y axis
+      const dx = camera.position.x - target.hpBarGroup.position.x;
+      const dz = camera.position.z - target.hpBarGroup.position.z;
+      const angle = Math.atan2(dx, dz);
+      target.hpBarGroup.rotation.y = angle;
 
-      // Update HP bar fill
+      // Update HP bar fill width based on HP percentage
       const hpFill = target.hpBarGroup.userData.hpFill;
       const hpPercent = target.hp / target.maxHp;
-      hpFill.scale.x = hpPercent;
-      hpFill.position.x = (hpPercent - 1) * 0.95;
+      hpFill.scale.x = Math.max(0, hpPercent);
 
-      // Update text only when HP changes significantly to avoid lag
+      // Update text only when HP changes
       const hpText = target.hpBarGroup.userData.hpText;
       const currentText = target.isImmortal ? '∞' : `${Math.ceil(target.hp)}/${target.maxHp}`;
       if (hpText.userData.currentText !== currentText) {
