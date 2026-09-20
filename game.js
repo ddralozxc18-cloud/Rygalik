@@ -1106,6 +1106,11 @@
     bg.name = 'hpBg';
     group.add(bg);
 
+    // HP fill container - this will be scaled
+    const fillContainer = new THREE.Group();
+    fillContainer.position.set(-0.95, 0, 0.01);
+    group.add(fillContainer);
+
     // HP fill
     const fillGeo = new THREE.PlaneGeometry(1.9, 0.25);
     const fillMat = new THREE.MeshBasicMaterial({ 
@@ -1115,11 +1120,11 @@
       depthWrite: false
     });
     const fill = new THREE.Mesh(fillGeo, fillMat);
-    fill.position.set(-0.95, 0, 0.02); // Start at left edge, slightly in front of bg
-    fill.scale.set(1, 1, 1); // Initial scale
+    fill.position.set(0.95, 0, 0); // Center of the visible portion
+    fill.scale.set(0, 1, 1); // Start at 0 width
     fill.renderOrder = 1000;
     fill.name = 'hpFill';
-    group.add(fill);
+    fillContainer.add(fill);
 
     // Text label
     const textGeo = new THREE.PlaneGeometry(1.5, 0.4);
@@ -1140,7 +1145,7 @@
       depthWrite: false
     });
     const textMesh = new THREE.Mesh(textGeo, textMat);
-    textMesh.position.set(0, 0.4, 0.03); // Slightly in front of fill
+    textMesh.position.set(0, 0.4, 0.02); // Slightly in front of fill
     textMesh.renderOrder = 1001;
     textMesh.name = 'hpText';
     textMesh.userData.currentText = text;
@@ -1149,7 +1154,8 @@
     // Store references for updates
     group.userData = { 
       hpBg: bg,
-      hpFill: fill, 
+      hpFill: fill,
+      hpFillContainer: fillContainer, 
       hpText: textMesh,
       lastHpValue: text
     };
@@ -1170,12 +1176,11 @@
       target.hpBarGroup.rotation.y = angle;
 
       // Update HP bar fill width based on HP percentage
+      const hpFillContainer = target.hpBarGroup.userData.hpFillContainer;
       const hpFill = target.hpBarGroup.userData.hpFill;
       const hpPercent = target.hp / target.maxHp;
-      // Only update scale if it changed to prevent flickering
-      if (Math.abs(hpFill.scale.x - hpPercent) > 0.001) {
-        hpFill.scale.x = Math.max(0, hpPercent);
-      }
+      // Scale the container to show the correct HP amount
+      hpFillContainer.scale.x = Math.max(0, hpPercent);
 
       // Update text only when HP changes
       const hpText = target.hpBarGroup.userData.hpText;
