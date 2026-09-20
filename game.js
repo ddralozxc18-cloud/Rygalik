@@ -13,13 +13,9 @@
     eyeHeight: 1.7,
     gravity: -22,
     jumpSpeed: 8,
-    jumpStaminaCost: 10,
+    jumpStaminaCost: 0,
 
-    walkSpeed: 4.2,
-    runSpeed: 8.6,
-    runStaminaDrain: 22,
-    staminaRegenDelay: 0.9,
-    staminaRegenRate: 14,
+    walkSpeed: 4.3,
 
     manaRegenRate: 4,
     flareManaCost: 18,
@@ -39,7 +35,6 @@
     gem:            { name: 'Кристалл',           icon: '◆', color: '#7dd3fc', use: null },
     potion_hp:      { name: 'Зелье здоровья',      icon: '♥', color: '#e0403a', use: (s) => { s.hp = Math.min(s.maxHp, s.hp + 35); } },
     potion_mana:    { name: 'Зелье маны',          icon: '✦', color: '#4c8dfb', use: (s) => { s.mana = Math.min(s.maxMana, s.mana + 40); } },
-    potion_stamina: { name: 'Зелье выносливости',  icon: '⚡', color: '#c3e05a', use: (s) => { s.stamina = Math.min(s.maxStamina, s.stamina + 50); } },
   };
 
   // ---------------------------------------------------------
@@ -53,13 +48,11 @@
 
     hp: 100, maxHp: 100,
     mana: 100, maxMana: 100,
-    stamina: 100, maxStamina: 100,
 
     level: 1,
     xp: 0,
     xpToNextLevel: 100,
 
-    lastStaminaUseTime: -999,
     lastDamageTime: -999,
 
     onGround: true,
@@ -117,9 +110,6 @@
   const manaFillEl = document.getElementById('mana-fill');
   const manaValueEl = document.getElementById('mana-value');
   const manaRegenEl = document.getElementById('mana-regen');
-  const staminaFillEl = document.getElementById('stamina-fill');
-  const staminaValueEl = document.getElementById('stamina-value');
-  const staminaRegenEl = document.getElementById('stamina-regen');
   const gemCountEl = document.getElementById('gem-count');
   const levelValueEl = document.getElementById('level-value');
   const xpFillEl = document.getElementById('xp-fill');
@@ -138,6 +128,15 @@
   const flares = [];
   let damageFlashTimeout = null;
   let fpsAccum = 0, fpsFrames = 0, fpsTimer = 0;
+
+  // ---------------------------------------------------------
+  // Звуки ходьбы
+  // ---------------------------------------------------------
+  let walkSound1 = null;
+  let walkSound2 = null;
+  let walkSoundCurrent = null;
+  let lastFootstepTime = 0;
+  let footstepInterval = 0.5; // Интервал между шагами (будет меняться от скорости)
 
   // ---------------------------------------------------------
   // Инициализация сцены, освещения и рендера
@@ -175,6 +174,18 @@
     scene.add(sun);
 
     clock = new THREE.Clock();
+
+    // Загрузка звуков ходьбы
+    try {
+      walkSound1 = new Audio('sounds/walk1.mp3');
+      walkSound2 = new Audio('sounds/walk2.mp3');
+      walkSound1.volume = 0.4;
+      walkSound2.volume = 0.4;
+      walkSound1.loop = false;
+      walkSound2.loop = false;
+    } catch (e) {
+      console.warn('Звуки ходьбы не загружены:', e);
+    }
   }
 
   // ---------------------------------------------------------
@@ -293,7 +304,6 @@
       'gem', 'gem', 'gem', 'gem',
       'potion_hp', 'potion_hp', 'potion_hp',
       'potion_mana', 'potion_mana', 'potion_mana',
-      'potion_stamina', 'potion_stamina', 'potion_stamina',
     ];
     const total = 20;
     for (let i = 0; i < total; i++) {
@@ -351,9 +361,6 @@
     manaFillEl.style.width = (state.mana / state.maxMana * 100) + '%';
     manaValueEl.textContent = Math.ceil(state.mana) + '/' + state.maxMana;
 
-    staminaFillEl.style.width = (state.stamina / state.maxStamina * 100) + '%';
-    staminaValueEl.textContent = Math.ceil(state.stamina) + '/' + state.maxStamina;
-
     gemCountEl.textContent = state.gems;
 
     levelValueEl.textContent = state.level;
@@ -408,8 +415,6 @@
       state.hp = state.maxHp;
       state.maxMana += 15;
       state.mana = state.maxMana;
-      state.maxStamina += 15;
-      state.stamina = state.maxStamina;
     }
     updateHUD();
   }
@@ -426,7 +431,7 @@
 
   function renderInventoryGrid() {
     inventoryGridEl.innerHTML = '';
-    const order = ['gem', 'potion_hp', 'potion_mana', 'potion_stamina'];
+    const order = ['gem', 'potion_hp', 'potion_mana'];
     const totalSlots = 16;
     for (let i = 0; i < totalSlots; i++) {
       const slot = document.createElement('div');
@@ -541,9 +546,7 @@
     if (state.keys['KeyA']) moveX -= 1;
 
     const isMoving = moveX !== 0 || moveZ !== 0;
-    const wantsRun = !!state.keys['ShiftLeft'] || !!state.keys['ShiftRight'];
-    const isRunning = wantsRun && isMoving && state.stamina > 0;
-    const speed = isRunning ? CONFIG.runSpeed : CONFIG.walkSpeed;
+    const speed = CONFIG.walkSpeed;
 
     if (isMoving) {
       const len = Math.hypot(moveX, moveZ);
@@ -559,14 +562,6 @@
       camera.position.z = next.z;
     }
 
-    // Выносливость
-    if (isRunning) {
-      state.stamina = Math.max(0, state.stamina - CONFIG.runStaminaDrain * dt);
-      state.lastStaminaUseTime = elapsed;
-    } else if (elapsed - state.lastStaminaUseTime > CONFIG.staminaRegenDelay) {
-      state.stamina = Math.min(state.maxStamina, state.stamina + CONFIG.staminaRegenRate * dt);
-    }
-
     // Мана и здоровье
     state.mana = Math.min(state.maxMana, state.mana + CONFIG.manaRegenRate * dt);
     if (elapsed - state.lastDamageTime > CONFIG.hpRegenDelay) {
@@ -574,13 +569,11 @@
     }
 
     // Обновление показателей восстановления в HUD
-    const staminaRegenDisplay = (elapsed - state.lastStaminaUseTime > CONFIG.staminaRegenDelay && !isRunning) ? CONFIG.staminaRegenRate : 0;
     const hpRegenDisplay = (elapsed - state.lastDamageTime > CONFIG.hpRegenDelay) ? CONFIG.hpRegenRate : 0;
     const manaRegenDisplay = CONFIG.manaRegenRate;
     
     hpRegenEl.textContent = '+' + hpRegenDisplay.toFixed(1) + '/сек';
     manaRegenEl.textContent = '+' + manaRegenDisplay.toFixed(1) + '/сек';
-    staminaRegenEl.textContent = '+' + staminaRegenDisplay.toFixed(1) + '/сек';
 
     // Вертикальная физика (гравитация и прыжок)
     state.velocityY += CONFIG.gravity * dt;
@@ -599,10 +592,17 @@
       state.onGround = false;
     }
 
-    // Покачивание камеры при ходьбе/беге
+    // Покачивание камеры при ходьбе
     if (state.onGround && isMoving) {
-      state.bobTimer += dt * (isRunning ? 13 : 8.4);
-      state.bobOffset = Math.sin(state.bobTimer) * (isRunning ? 0.085 : 0.05);
+      state.bobTimer += dt * 8.4;
+      state.bobOffset = Math.sin(state.bobTimer) * 0.05;
+      
+      // Воспроизведение звуков шагов
+      const stepInterval = 0.5;
+      if (elapsed - lastFootstepTime > stepInterval) {
+        lastFootstepTime = elapsed;
+        playFootstep();
+      }
     } else {
       state.bobOffset += (0 - state.bobOffset) * Math.min(1, dt * 8);
     }
@@ -621,6 +621,23 @@
   // ---------------------------------------------------------
   // Управление состояниями игры
   // ---------------------------------------------------------
+  function playFootstep() {
+    if (!walkSound1 || !walkSound2) return;
+    
+    // Останавливаем текущий звук
+    if (walkSoundCurrent && !walkSoundCurrent.paused) {
+      walkSoundCurrent.pause();
+      walkSoundCurrent.currentTime = 0;
+    }
+    
+    // Выбираем следующий звук (чередование)
+    walkSoundCurrent = (walkSoundCurrent === walkSound1) ? walkSound2 : walkSound1;
+    
+    // Сбрасываем и воспроизводим
+    walkSoundCurrent.currentTime = 0;
+    walkSoundCurrent.play().catch(() => {});
+  }
+
   function resetPlayerPosition() {
     camera.position.set(0, CONFIG.eyeHeight, 6);
     camera.rotation.set(0, 0, 0);
@@ -651,7 +668,6 @@
   function respawn() {
     state.hp = state.maxHp;
     state.mana = state.maxMana;
-    state.stamina = state.maxStamina;
     state.lastDamageTime = -999;
     resetPlayerPosition();
     state.dead = false;
@@ -665,15 +681,12 @@
     state.maxHp = 100;
     state.mana = 100;
     state.maxMana = 100;
-    state.stamina = 100;
-    state.maxStamina = 100;
     state.level = 1;
     state.xp = 0;
     state.xpToNextLevel = 100;
     state.inventory = {};
     state.gems = 0;
     state.lastDamageTime = -999;
-    state.lastStaminaUseTime = -999;
     collectibles.forEach((c) => { c.collected = false; c.mesh.visible = true; });
     resetPlayerPosition();
     state.dead = false;
