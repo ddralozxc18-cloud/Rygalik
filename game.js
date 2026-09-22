@@ -159,6 +159,7 @@
     camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 300);
     camera.rotation.order = 'YXZ';
     camera.position.set(0, CONFIG.eyeHeight, 6);
+    scene.add(camera); // Добавляем камеру в сцену сразу при инициализации
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -502,7 +503,9 @@
     handGroup.rotation.y = -0.1;
     handGroup.rotation.x = 0.05;
     
-    scene.add(handGroup);
+    // Прикрепляем руку к камере, чтобы она двигалась вместе с игроком
+    camera.add(handGroup);
+    
     return handGroup;
   }
 
