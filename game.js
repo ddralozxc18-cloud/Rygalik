@@ -760,7 +760,7 @@
       const hitMesh = intersects[0].object;
       const target = targets.find(t => t.mesh === hitMesh);
       if (target) {
-        // Deal damage (e.g., 25 damage per hit)
+        // Deal damage (e.g., 25 damage per hit) and show immediately
         applyDamageToTarget(target, 25);
       }
     }
@@ -996,7 +996,6 @@
           let count = targets.length;
           for (const target of targets) {
             scene.remove(target.mesh);
-            if (target.hpBarGroup) scene.remove(target.hpBarGroup);
             // Remove damage numbers
             if (target.damageNumbers) {
               for (const dn of target.damageNumbers) {
@@ -1063,17 +1062,11 @@
     mesh.receiveShadow = true;
     scene.add(mesh);
 
-    // Create HP bar above target
-    const hpBarGroup = createHPBar(isSuperBob ? '∞' : '100/100');
-    hpBarGroup.position.copy(spawnPos);
-    hpBarGroup.position.y += 2.5;
-    scene.add(hpBarGroup);
-
-    // Target object
+    // Target object (no HP bar anymore)
     const target = {
       type: type,
       mesh: mesh,
-      hpBarGroup: hpBarGroup,
+      hpBarGroup: null,
       hp: 100,
       maxHp: 100,
       hpRegen: 2,
@@ -1091,42 +1084,7 @@
   function createHPBar(text) {
     const group = new THREE.Group();
     
-    // Background - use sprite to always face camera
-    const bgGeo = new THREE.PlaneGeometry(2, 0.3);
-    const bgMat = new THREE.MeshBasicMaterial({ 
-      color: 0x000000, 
-      opacity: 0.7, 
-      transparent: true, 
-      side: THREE.DoubleSide,
-      depthTest: false,
-      depthWrite: false
-    });
-    const bg = new THREE.Mesh(bgGeo, bgMat);
-    bg.renderOrder = 999;
-    bg.name = 'hpBg';
-    group.add(bg);
-
-    // HP fill container - this will be scaled
-    const fillContainer = new THREE.Group();
-    fillContainer.position.set(-0.95, 0, 0.01);
-    group.add(fillContainer);
-
-    // HP fill
-    const fillGeo = new THREE.PlaneGeometry(1.9, 0.25);
-    const fillMat = new THREE.MeshBasicMaterial({ 
-      color: 0x00ff00, 
-      side: THREE.DoubleSide,
-      depthTest: false,
-      depthWrite: false
-    });
-    const fill = new THREE.Mesh(fillGeo, fillMat);
-    fill.position.set(0.95, 0, 0); // Center of the visible portion
-    fill.scale.set(0, 1, 1); // Start at 0 width
-    fill.renderOrder = 1000;
-    fill.name = 'hpFill';
-    fillContainer.add(fill);
-
-    // Text label
+    // Text label only (no HP bar)
     const textGeo = new THREE.PlaneGeometry(1.5, 0.4);
     const canvas = document.createElement('canvas');
     canvas.width = 256;
@@ -1145,7 +1103,7 @@
       depthWrite: false
     });
     const textMesh = new THREE.Mesh(textGeo, textMat);
-    textMesh.position.set(0, 0.4, 0.02); // Slightly in front of fill
+    textMesh.position.set(0, 0, 0.02);
     textMesh.renderOrder = 1001;
     textMesh.name = 'hpText';
     textMesh.userData.currentText = text;
@@ -1153,9 +1111,6 @@
 
     // Store references for updates
     group.userData = { 
-      hpBg: bg,
-      hpFill: fill,
-      hpFillContainer: fillContainer, 
       hpText: textMesh,
       lastHpValue: text
     };
@@ -1165,39 +1120,8 @@
 
   function updateHPBars() {
     for (const target of targets) {
-      // Position HP bar above target
-      target.hpBarGroup.position.copy(target.mesh.position);
-      target.hpBarGroup.position.y += 2.5;
+      // Skip HP bar updates since we removed them
       
-      // Make HP bar face camera - rotate only around Y axis
-      const dx = camera.position.x - target.hpBarGroup.position.x;
-      const dz = camera.position.z - target.hpBarGroup.position.z;
-      const angle = Math.atan2(dx, dz);
-      target.hpBarGroup.rotation.y = angle;
-
-      // Update HP bar fill width based on HP percentage
-      const hpFillContainer = target.hpBarGroup.userData.hpFillContainer;
-      const hpFill = target.hpBarGroup.userData.hpFill;
-      const hpPercent = target.hp / target.maxHp;
-      // Scale the container to show the correct HP amount
-      hpFillContainer.scale.x = Math.max(0, hpPercent);
-
-      // Update text only when HP changes
-      const hpText = target.hpBarGroup.userData.hpText;
-      const currentText = target.isImmortal ? '∞' : `${Math.ceil(target.hp)}/${target.maxHp}`;
-      if (hpText.userData.currentText !== currentText) {
-        const canvas = hpText.material.map.image;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 32px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(currentText, 128, 44);
-        hpText.material.map.needsUpdate = true;
-        hpText.userData.currentText = currentText;
-      }
-
       // Regen
       const now = clock.getElapsedTime();
       if (now - target.lastRegenTime >= 1 && target.hp < target.maxHp) {
@@ -1221,22 +1145,27 @@
     ctx.textAlign = 'center';
     ctx.fillText(amount.toString(), 64, 48);
     const texture = new THREE.CanvasTexture(canvas);
-    const material = new THREE.MeshBasicMaterial({ 
+    const material = new THREE.SpriteMaterial({ 
       map: texture, 
       transparent: true,
       depthTest: false,
-      depthWrite: false,
-      side: THREE.DoubleSide
+      depthWrite: false
     });
-    const geometry = new THREE.PlaneGeometry(0.8, 0.4);
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.copy(target.mesh.position);
-    mesh.position.y += 1.5;
-    mesh.renderOrder = 2000;
-    scene.add(mesh);
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(1.2, 0.6, 1);
+    sprite.position.copy(target.mesh.position);
+    sprite.position.y += 1.5;
+    sprite.renderOrder = 2000;
+    
+    // Make damage number face player immediately
+    const playerDir = new THREE.Vector3();
+    camera.getWorldDirection(playerDir);
+    sprite.lookAt(camera.position);
+    
+    scene.add(sprite);
 
     target.damageNumbers.push({
-      mesh: mesh,
+      mesh: sprite,
       amount: amount,
       birthTime: clock.getElapsedTime(),
       lifetime: 1.5
@@ -1250,15 +1179,15 @@
       
       if (age >= dn.lifetime) {
         scene.remove(dn.mesh);
-        dn.mesh.geometry.dispose();
         dn.mesh.material.map.dispose();
         dn.mesh.material.dispose();
         target.damageNumbers.splice(i, 1);
         continue;
       }
 
+      // Make damage number face camera (Sprites always face camera by default)
       // Move up and fade
-      dn.mesh.position.y += 0.03;
+      dn.mesh.position.y += 0.05;
       const opacity = 1 - (age / dn.lifetime);
       dn.mesh.material.opacity = opacity;
     }
@@ -1267,13 +1196,14 @@
   function applyDamageToTarget(target, amount) {
     if (!target) return;
     
+    // Show damage number immediately for both immortal and mortal targets
+    showDamageNumber(target, amount);
+    
     if (target.isImmortal) {
-      showDamageNumber(target, amount);
       return;
     }
 
     target.hp = Math.max(0, target.hp - amount);
-    showDamageNumber(target, amount);
 
     if (target.hp <= 0) {
       // Target destroyed
