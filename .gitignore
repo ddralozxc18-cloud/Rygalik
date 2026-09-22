@@ -19,33 +19,36 @@ venv/
 .env.local
 .env.*
 
-# Build directories
-dist/
-build/
-target/
+# Logs and temp files
 *.log
-coverage/
-htmlcov/
-.coverage
-
-# Editors and IDEs
-.vscode/
-.idea/
+*.tmp
 *.swp
 *.swo
-*.tmp
+
+# Editors
+.vscode/
+.idea/
 
 # System files
 .DS_Store
 Thumbs.db
 
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Build directories
+dist/
+build/
+target/
+.gradle/
+
 # Python specific
-*.py[cod]
-*$py.class
-*.so
-.Python
-*.egg-info/
-.egg/
+.mypy_cache/
+.pytest_cache/
+*.pyc
+__pycache__/
 
 # Compressed files
 *.zip
@@ -70,30 +73,4 @@ Thumbs.db
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-
-# MyPy cache
-.mypy_cache/
-.pytest_cache/
-
-# Gradle
-.gradle/
-
-# Julia
-.julia/
-
-# Zig
-.zig-cache/
-zig-cache/
-
-# Temporary files
-*.tmp
-*~
-```
-
-Wait, I need to reconsider this. Looking at the input again, only `game.js` and `style.css` were modified - these are source files, not build artifacts or dependencies. According to rule #6, if the changes contain only source/config files and no build artifacts, dependencies, or temp files, I should output an empty .gitignore.
-
-Since only `game.js` and `style.css` (source files) were modified, and there are no build artifacts, dependencies, or temp files in the change list, the output should be empty.
-
-```gitignore
-
 ```

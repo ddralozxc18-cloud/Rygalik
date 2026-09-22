@@ -872,6 +872,7 @@
     updateHUD();
     renderInventoryGrid();
     initHand();
+    container.requestPointerLock();
   }
 
   function die() {
@@ -921,6 +922,8 @@
     state.paused = false;
     deathScreen.classList.add('hidden');
     pauseScreen.classList.add('hidden');
+    menuFrameContainer.classList.add('hidden');
+    hudEl.classList.remove('hidden');
     updateHUD();
     renderInventoryGrid();
     // Reinitialize hand if it was removed
@@ -1005,7 +1008,7 @@
     if (locked) {
       pauseScreen.classList.add('hidden');
       state.paused = false;
-      if (!state.started) beginGame();
+      // Не вызываем beginGame() здесь, так как игра уже инициализирована через START_GAME
     } else if (state.started && !state.dead && !state.inventoryOpen) {
       state.paused = true;
       state.keys = {};
@@ -1103,13 +1106,28 @@
     // Слушаем сообщения от iframe меню
     window.addEventListener('message', (event) => {
       if (event.data && event.data.type === 'START_GAME') {
+        state.started = true;
+        state.paused = false;
+        menuFrameContainer.classList.add('hidden');
+        hudEl.classList.remove('hidden');
+        resetPlayerPosition();
+        updateHUD();
+        renderInventoryGrid();
+        initHand();
         container.requestPointerLock();
-        if (!state.started) beginGame();
       }
     });
     
-    resumeBtn.addEventListener('click', () => container.requestPointerLock());
-    restartBtn.addEventListener('click', fullReset);
+    resumeBtn.addEventListener('click', () => {
+      state.paused = false;
+      container.requestPointerLock();
+    });
+    restartBtn.addEventListener('click', () => {
+      fullReset();
+      menuFrameContainer.classList.remove('hidden');
+      hudEl.classList.add('hidden');
+      state.started = false;
+    });
     respawnBtn.addEventListener('click', respawn);
     closeInventoryBtn.addEventListener('click', toggleInventory);
 
