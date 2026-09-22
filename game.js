@@ -38,6 +38,38 @@
   };
 
   // ---------------------------------------------------------
+  // Состояние игрока — слоты экипировки
+  // ---------------------------------------------------------
+  const equipmentState = {
+    hand: null,              // Слот руки (по умолчанию стандартная рука)
+    active1: null,           // Активный слот 1 (клавиша Shift)
+    active2: null,           // Активный слот 2 (клавиша C)
+    passive1: null,          // Пассивный слот 1
+    passive2: null,          // Пассивный слот 2
+  };
+
+  // Стандартная рука по умолчанию
+  const DEFAULT_HAND = {
+    id: 'default_hand',
+    name: 'Рука',
+    icon: '✊',
+    damage: 1,
+  };
+
+  // Инициализация руки по умолчанию
+  equipmentState.hand = DEFAULT_HAND;
+
+  // ---------------------------------------------------------
+  // Получить текущий урон руки
+  // ---------------------------------------------------------
+  function getHandDamage() {
+    if (equipmentState.hand && typeof equipmentState.hand.damage === 'number') {
+      return equipmentState.hand.damage;
+    }
+    return 1; // Урон по умолчанию
+  }
+
+  // ---------------------------------------------------------
   // Состояние игры
   // ---------------------------------------------------------
   const state = {
@@ -112,6 +144,9 @@
   const gemCountEl = document.getElementById('gem-count');
   const levelValueEl = document.getElementById('level-value');
   const xpFillEl = document.getElementById('xp-fill');
+
+  const hudActive1Icon = document.getElementById('hud-active1-icon');
+  const hudActive2Icon = document.getElementById('hud-active2-icon');
 
   const pickupPromptEl = document.getElementById('pickup-prompt');
   const inventoryGridEl = document.getElementById('inventory-grid');
@@ -375,6 +410,33 @@
 
     levelValueEl.textContent = state.level;
     xpFillEl.style.width = (state.xp / state.xpToNextLevel * 100) + '%';
+
+    // Обновляем HUD слоты активных предметов
+    updateActiveSlotsHUD();
+  }
+
+  function updateActiveSlotsHUD() {
+    // Слот 1 (Shift)
+    if (equipmentState.active1) {
+      hudActive1Icon.textContent = equipmentState.active1.icon || '?';
+      hudActive1Icon.parentElement.classList.add('filled');
+      hudActive1Icon.parentElement.style.color = equipmentState.active1.color || '#eae6da';
+    } else {
+      hudActive1Icon.textContent = '';
+      hudActive1Icon.parentElement.classList.remove('filled');
+      hudActive1Icon.parentElement.style.color = '';
+    }
+
+    // Слот 2 (C)
+    if (equipmentState.active2) {
+      hudActive2Icon.textContent = equipmentState.active2.icon || '?';
+      hudActive2Icon.parentElement.classList.add('filled');
+      hudActive2Icon.parentElement.style.color = equipmentState.active2.color || '#eae6da';
+    } else {
+      hudActive2Icon.textContent = '';
+      hudActive2Icon.parentElement.classList.remove('filled');
+      hudActive2Icon.parentElement.style.color = '';
+    }
   }
 
   function updateFpsCounter(dt) {
@@ -445,6 +507,45 @@
 
   function renderInventoryGrid() {
     inventoryGridEl.innerHTML = '';
+
+    // Создаём секцию экипировки
+    const equipmentSection = document.createElement('div');
+    equipmentSection.className = 'equipment-section';
+    
+    // Слот руки
+    const handSlot = createEquipmentSlot('hand', equipmentState.hand, 'Рука');
+    equipmentSection.appendChild(handSlot);
+
+    // Активные слоты (Shift и C)
+    const activeSlotsContainer = document.createElement('div');
+    activeSlotsContainer.className = 'active-slots-container';
+    
+    const active1Slot = createEquipmentSlot('active1', equipmentState.active1, 'Активный 1 (Shift)');
+    const active2Slot = createEquipmentSlot('active2', equipmentState.active2, 'Активный 2 (C)');
+    
+    activeSlotsContainer.appendChild(active1Slot);
+    activeSlotsContainer.appendChild(active2Slot);
+    equipmentSection.appendChild(activeSlotsContainer);
+
+    // Пассивные слоты
+    const passiveSlotsContainer = document.createElement('div');
+    passiveSlotsContainer.className = 'passive-slots-container';
+    
+    const passive1Slot = createEquipmentSlot('passive1', equipmentState.passive1, 'Пассивный 1');
+    const passive2Slot = createEquipmentSlot('passive2', equipmentState.passive2, 'Пассивный 2');
+    
+    passiveSlotsContainer.appendChild(passive1Slot);
+    passiveSlotsContainer.appendChild(passive2Slot);
+    equipmentSection.appendChild(passiveSlotsContainer);
+
+    inventoryGridEl.appendChild(equipmentSection);
+
+    // Разделитель
+    const divider = document.createElement('div');
+    divider.className = 'inventory-divider';
+    inventoryGridEl.appendChild(divider);
+
+    // Основной инвентарь (предметы)
     const order = ['gem', 'potion_hp', 'potion_mana'];
     const totalSlots = 16;
     for (let i = 0; i < totalSlots; i++) {
@@ -463,6 +564,24 @@
       }
       inventoryGridEl.appendChild(slot);
     }
+  }
+
+  function createEquipmentSlot(slotName, item, tooltipText) {
+    const slot = document.createElement('div');
+    slot.className = 'equip-slot';
+    slot.dataset.slot = slotName;
+    
+    if (item) {
+      slot.classList.add('filled');
+      slot.style.color = item.color || '#eae6da';
+      slot.innerHTML = (item.icon || '?') +
+        '<span class="equip-tooltip">' + (item.name || tooltipText) + '</span>';
+    } else {
+      slot.innerHTML = '<span class="slot-empty">+</span>' +
+        '<span class="equip-tooltip">' + tooltipText + '</span>';
+    }
+    
+    return slot;
   }
 
   function collectItem(item) {
@@ -784,6 +903,14 @@
     state.inventory = {};
     state.gems = 0;
     state.lastDamageTime = -999;
+    
+    // Сброс экипировки к значениям по умолчанию
+    equipmentState.hand = DEFAULT_HAND;
+    equipmentState.active1 = null;
+    equipmentState.active2 = null;
+    equipmentState.passive1 = null;
+    equipmentState.passive2 = null;
+    
     collectibles.forEach((c) => { c.collected = false; c.mesh.visible = true; });
     resetPlayerPosition();
     state.dead = false;
@@ -858,8 +985,10 @@
       
       const target = targets.find(t => t.mesh === hitMesh);
       if (target) {
-        // Deal damage (e.g., 25 damage per hit) and show immediately
-        applyDamageToTarget(target, 25);
+        // Получаем урон от текущей руки
+        const damage = getHandDamage();
+        // Deal damage and show immediately
+        applyDamageToTarget(target, damage);
       }
     }
   }
@@ -914,6 +1043,25 @@
       if (state.inventoryOpen) toggleInventory();
       return;
     }
+    
+    // Обработка клавиш для активных слотов (Shift и C)
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+      e.preventDefault();
+      if (equipmentState.active1 && equipmentState.active1.use) {
+        equipmentState.active1.use(state);
+        updateHUD();
+      }
+      return;
+    }
+    if (e.code === 'KeyC') {
+      e.preventDefault();
+      if (equipmentState.active2 && equipmentState.active2.use) {
+        equipmentState.active2.use(state);
+        updateHUD();
+      }
+      return;
+    }
+    
     if (!isActive()) return;
 
     if (e.code === 'Space') {
