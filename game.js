@@ -505,20 +505,25 @@
     renderInventoryGrid();
   }
 
+
   function renderInventoryGrid() {
     inventoryGridEl.innerHTML = '';
 
     // Создаём секцию экипировки
     const equipmentSection = document.createElement('div');
     equipmentSection.className = 'equipment-section';
-    
-    // Ряд с рукой
-    const handRow = document.createElement('div');
-    handRow.className = 'equipment-row';
-    const handSlot = createEquipmentSlot('hand', equipmentState.hand, 'Рука');
-    handRow.appendChild(handSlot);
-    equipmentSection.appendChild(handRow);
 
+    // Ряд с рукой, активными и пассивными слотами
+    const mainRow = document.createElement('div');
+    mainRow.className = 'equipment-row';
+    
+    // Слот руки
+    const handSlot = createEquipmentSlot('hand', equipmentState.hand, 'Рука');
+    const handWrapper = document.createElement('div');
+    handWrapper.className = 'equip-slot-wrapper';
+    handWrapper.appendChild(handSlot);
+    mainRow.appendChild(handWrapper);
+    
     // Активные слоты (Shift и C)
     const activeSlotsContainer = document.createElement('div');
     activeSlotsContainer.className = 'active-slots-container';
@@ -528,8 +533,8 @@
     
     activeSlotsContainer.appendChild(active1Slot);
     activeSlotsContainer.appendChild(active2Slot);
-    equipmentSection.appendChild(activeSlotsContainer);
-
+    mainRow.appendChild(activeSlotsContainer);
+    
     // Пассивные слоты
     const passiveSlotsContainer = document.createElement('div');
     passiveSlotsContainer.className = 'passive-slots-container';
@@ -539,10 +544,10 @@
     
     passiveSlotsContainer.appendChild(passive1Slot);
     passiveSlotsContainer.appendChild(passive2Slot);
-    equipmentSection.appendChild(passiveSlotsContainer);
-
+    mainRow.appendChild(passiveSlotsContainer);
+    
+    equipmentSection.appendChild(mainRow);
     inventoryGridEl.appendChild(equipmentSection);
-
     // Разделитель
     const divider = document.createElement('div');
     divider.className = 'inventory-divider';
@@ -1048,7 +1053,7 @@
     if (e.code === 'KeyI') {
       e.preventDefault();
       if (state.inventoryOpen) { toggleInventory(); }
-      else if (state.started && !state.dead && !state.paused) { toggleInventory(); }
+      else if (state.started && !state.dead && !state.paused && !state.inventoryOpen) { toggleInventory(); }
       return;
     }
     if (e.code === 'Escape') {

@@ -525,16 +525,22 @@ html, body{
 }
 
 .equipment-row{
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+  justify-content: center;
+}
+
+.equip-slot-wrapper{
+  width: 48px;
+  height: 48px;
 }
 
 .active-slots-container,
 .passive-slots-container{
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  display: flex;
   gap: 8px;
+  justify-content: center;
 }
 
 /* Слоты экипировки */
