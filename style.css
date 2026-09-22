@@ -62,7 +62,7 @@ html, body{
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: radial-gradient(circle at 50% 40%, rgba(20,22,30,0.55), rgba(6,7,10,0.92));
+  background: #000000;
   backdrop-filter: blur(3px);
   animation: fade-in 0.35s ease both;
 }
@@ -84,13 +84,23 @@ html, body{
   box-shadow: 0 30px 60px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.03);
   text-align: center;
 }
-.menu-card::-webkit-scrollbar{ width: 6px; }
-.menu-card::-webkit-scrollbar-thumb{ background: var(--panel-border); border-radius: 3px; }
+#menu-screen{
+  flex-direction: column;
+}
+
+#menu-screen .btn-primary{
+  margin-top: auto;
+  margin-bottom: 60px;
+}
 
 .rygalik-title{
   font-size: 56px;
   letter-spacing: 0.15em;
   margin-bottom: 4px;
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .menu-eyebrow{
@@ -111,6 +121,16 @@ html, body{
   text-shadow: 0 2px 18px rgba(201,162,39,0.35);
 }
 .menu-title.small{ font-size: 30px; margin-bottom: 18px; }
+
+.pre-alpha{
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  font-size: 12px;
+  color: var(--gold);
+  font-family: var(--font-body);
+  letter-spacing: 0.05em;
+}
 
 .menu-subtitle{
   margin: 0 0 26px;
@@ -178,6 +198,21 @@ html, body{
 .sens-label input[type="range"]{
   width: 100%;
   accent-color: var(--gold);
+}
+
+.fps-toggle-label{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text);
+  margin-bottom: 22px;
+  cursor: pointer;
+}
+.fps-toggle-label input[type="checkbox"]{
+  accent-color: var(--gold);
+  width: 16px;
+  height: 16px;
 }
 
 .btn-primary, .btn-secondary{
