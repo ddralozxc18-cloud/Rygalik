@@ -946,16 +946,17 @@
   function bindEvents() {
     startBtn.addEventListener('click', () => {
       container.requestPointerLock();
-      // Если pointerLock не сработал сразу (например, браузер заблокировал),
-      // всё равно начинаем игру
-      if (!state.started) {
-        beginGame();
-      }
+      if (!state.started) startGame();
     });
     resumeBtn.addEventListener('click', () => container.requestPointerLock());
     restartBtn.addEventListener('click', fullReset);
     respawnBtn.addEventListener('click', respawn);
     closeInventoryBtn.addEventListener('click', toggleInventory);
+
+    const fpsToggle = document.getElementById('fps-toggle');
+    fpsToggle.addEventListener('change', (e) => {
+      fpsCounterEl.style.display = e.target.checked ? 'block' : 'none';
+    });
 
     sensSliderPause.addEventListener('input', onSensitivityChange);
     fpsToggle.addEventListener('change', () => {});
