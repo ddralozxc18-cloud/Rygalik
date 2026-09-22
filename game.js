@@ -101,7 +101,6 @@
   const respawnBtn = document.getElementById('respawn-btn');
   const closeInventoryBtn = document.getElementById('close-inventory-btn');
 
-  const sensSlider = document.getElementById('sensitivity-slider');
   const sensSliderPause = document.getElementById('sensitivity-slider-pause');
   const fpsToggle = document.getElementById('fps-toggle');
 
@@ -823,7 +822,6 @@
   // ---------------------------------------------------------
   function onSensitivityChange(e) {
     state.mouseSensitivity = parseFloat(e.target.value);
-    sensSlider.value = state.mouseSensitivity;
     sensSliderPause.value = state.mouseSensitivity;
   }
 
@@ -946,13 +944,19 @@
   }
 
   function bindEvents() {
-    startBtn.addEventListener('click', () => container.requestPointerLock());
+    startBtn.addEventListener('click', () => {
+      container.requestPointerLock();
+      // Если pointerLock не сработал сразу (например, браузер заблокировал),
+      // всё равно начинаем игру
+      if (!state.started) {
+        beginGame();
+      }
+    });
     resumeBtn.addEventListener('click', () => container.requestPointerLock());
     restartBtn.addEventListener('click', fullReset);
     respawnBtn.addEventListener('click', respawn);
     closeInventoryBtn.addEventListener('click', toggleInventory);
 
-    sensSlider.addEventListener('input', onSensitivityChange);
     sensSliderPause.addEventListener('input', onSensitivityChange);
     fpsToggle.addEventListener('change', () => {});
 
