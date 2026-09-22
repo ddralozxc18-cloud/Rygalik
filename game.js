@@ -763,6 +763,10 @@
     state.dead = false;
     deathScreen.classList.add('hidden');
     updateHUD();
+    // Reinitialize hand if it was removed
+    if (!handMesh) {
+      initHand();
+    }
     container.requestPointerLock();
   }
 
@@ -785,6 +789,10 @@
     pauseScreen.classList.add('hidden');
     updateHUD();
     renderInventoryGrid();
+    // Reinitialize hand if it was removed
+    if (!handMesh) {
+      initHand();
+    }
     container.requestPointerLock();
   }
 
@@ -798,6 +806,10 @@
     } else {
       inventoryScreen.classList.add('hidden');
       container.requestPointerLock();
+      // Reinitialize hand if it was removed
+      if (!handMesh) {
+        initHand();
+      }
     }
   }
 
@@ -819,12 +831,13 @@
   }
 
   function onMouseDown(e) {
-    if (e.button === 2 && document.pointerLockElement === container && isActive()) {
+    if (e.button === 2 && document.pointerLockElement === container && state.started && !state.paused && !state.dead) {
       castFlare();
     }
     
-    // Punch animation on left click (button 0) - works even when cheat console is closed but game is active
-    if (e.button === 0 && !cheatConsoleOpen && isActive()) {
+    // Punch animation on left click (button 0) - works when game is active (not paused/dead)
+    // Allow punching even when cheat console is open
+    if (e.button === 0 && state.started && !state.paused && !state.dead) {
       startPunch();
       checkTargetHit();
     }
