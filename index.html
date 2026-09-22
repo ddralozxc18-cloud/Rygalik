@@ -1,121 +1,118 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Пустоши — низкополигональные земли</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Пустоши — низкополигональные земли</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-
-  <!-- 3D сцена монтируется сюда -->
-  <div id="game-container"></div>
-
-  <!-- ===== Главное меню (iframe) ===== -->
+  <div id="game-container" tabindex="-1"></div>
+  
   <div id="menu-frame-container" class="screen">
-    <iframe id="menu-frame" src="menu.html" frameborder="0"></iframe>
+    <iframe id="menu-frame" src="menu.html"></iframe>
   </div>
-
-  <!-- ===== Пауза ===== -->
+  
   <div id="pause-screen" class="screen hidden">
     <div class="menu-card">
       <h1 class="menu-title small">Пауза</h1>
       <button id="resume-btn" class="btn-primary">Продолжить</button>
-      <label class="sens-label">
-        <span>Чувствительность мыши</span>
-        <input type="range" id="sensitivity-slider-pause" min="0.3" max="3" step="0.1" value="1">
-      </label>
+      <div class="sens-label">
+        <label for="sensitivity-slider-pause">Чувствительность мыши</label>
+        <input type="range" id="sensitivity-slider-pause" min="0.1" max="3" step="0.1" value="1">
+      </div>
       <label class="fps-toggle-label">
-        <input type="checkbox" id="fps-toggle" checked>
-        <span>Счетчик FPS</span>
+        <input type="checkbox" id="fps-toggle">
+        Счетчик FPS
       </label>
       <button id="restart-btn" class="btn-secondary">Начать заново</button>
     </div>
   </div>
-
-  <!-- ===== Смерть ===== -->
+  
   <div id="death-screen" class="screen hidden">
     <div class="menu-card">
-      <h1 class="menu-title small">Вы пали...</h1>
+      <h1 class="menu-title">Вы пали...</h1>
       <p class="menu-subtitle">Земли забрали своё — но путь не окончен.</p>
       <button id="respawn-btn" class="btn-primary">Возродиться</button>
     </div>
   </div>
-
-  <!-- ===== HUD ===== -->
-  <div id="hud" class="hidden">
-    <div id="crosshair"><span></span><span></span></div>
-
-    <div id="stats-panel">
-      <div id="level-row">
-        <span class="level-label">Уровень <span id="level-value">1</span></span>
-        <div class="xp-track"><div id="xp-fill" class="xp-fill"></div></div>
-      </div>
-      
-      <div class="stats-container">
-        <div class="bar-row">
-          <span class="bar-icon hp-icon">♥</span>
-          <div class="bar-track"><div id="hp-fill" class="bar-fill hp-fill"></div></div>
-          <span class="bar-value" id="hp-value">100/100</span>
-          <span class="regen-value" id="hp-regen">+0/сек</span>
-        </div>
-        <div class="bar-row">
-          <span class="bar-icon mana-icon">✦</span>
-          <div class="bar-track"><div id="mana-fill" class="bar-fill mana-fill"></div></div>
-          <span class="bar-value" id="mana-value">100/100</span>
-          <span class="regen-value" id="mana-regen">+0/сек</span>
-        </div>
-      </div>
-    </div>
-
-    <div id="gem-counter">
-      <span class="bar-icon gem-icon">◆</span>
-      <span id="gem-count">0</span>
-    </div>
-
-    <!-- Слоты для активных предметов (справа в углу) -->
-    <div id="active-slots-hud">
-      <div class="hud-active-slot" id="hud-active1">
-        <span class="slot-key">Shift</span>
-        <span class="slot-icon" id="hud-active1-icon"></span>
-      </div>
-      <div class="hud-active-slot" id="hud-active2">
-        <span class="slot-key">C</span>
-        <span class="slot-icon" id="hud-active2-icon"></span>
-      </div>
-    </div>
-
-    <div id="pickup-prompt" class="hidden"></div>
-
-    <div id="inventory-hint">I — инвентарь</div>
-  </div>
-
-  <!-- ===== Инвентарь ===== -->
+  
   <div id="inventory-screen" class="screen hidden">
     <div class="inventory-card">
       <h2 class="inventory-title">Инвентарь</h2>
+      <div id="equipment-container"></div>
       <div id="inventory-grid"></div>
       <p class="inventory-hint-text">Нажмите на предмет, чтобы использовать его</p>
       <button id="close-inventory-btn" class="btn-secondary">Закрыть (I)</button>
     </div>
   </div>
-
+  
+  <div id="hud" class="hidden">
+    <div id="crosshair">
+      <span></span>
+      <span></span>
+    </div>
+    
+    <div id="stats-panel">
+      <div id="level-row">
+        <span class="level-label">Уровень <span id="level-value">1</span></span>
+        <div class="xp-track">
+          <div class="xp-fill" id="xp-fill"></div>
+        </div>
+      </div>
+      <div class="stats-container">
+        <div class="bar-row">
+          <span class="bar-icon hp-icon">♥</span>
+          <div class="bar-track">
+            <div class="bar-fill hp-fill" id="hp-fill"></div>
+          </div>
+          <span class="bar-value"><span id="hp-value">100/100</span></span>
+          <span class="regen-value" id="hp-regen">+0/сек</span>
+        </div>
+        <div class="bar-row">
+          <span class="bar-icon mana-icon">✦</span>
+          <div class="bar-track">
+            <div class="bar-fill mana-fill" id="mana-fill"></div>
+          </div>
+          <span class="bar-value"><span id="mana-value">100/100</span></span>
+          <span class="regen-value" id="mana-regen">+0/сек</span>
+        </div>
+      </div>
+    </div>
+    
+    <div id="gem-counter">
+      <span class="bar-icon gem-icon">◆</span>
+      <span id="gem-count">0</span>
+    </div>
+    
+    <div id="active-slots-hud">
+      <div class="hud-active-slot">
+        <span class="slot-key">Shift</span>
+        <span class="slot-icon" id="hud-active1-icon"></span>
+      </div>
+      <div class="hud-active-slot">
+        <span class="slot-key">C</span>
+        <span class="slot-icon" id="hud-active2-icon"></span>
+      </div>
+    </div>
+    
+    <div id="pickup-prompt" class="hidden"></div>
+    <div id="inventory-hint">I — инвентарь</div>
+  </div>
+  
   <div id="damage-vignette"></div>
   <div id="fps-counter"></div>
-
-  <!-- ===== Cheat Console ===== -->
+  
   <div id="cheat-console" class="hidden">
     <div id="console-input-wrapper">
-      <span id="console-prompt">></span>
-      <input type="text" id="console-input" placeholder="Введите чит-команду..." autocomplete="off">
+      <span id="console-prompt">&gt;</span>
+      <input type="text" id="console-input" placeholder="Введите команду...">
     </div>
     <div id="console-output"></div>
   </div>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
