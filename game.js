@@ -471,6 +471,82 @@
   }
 
   // ---------------------------------------------------------
+  // Анимация руки/удара (ЛКМ - как в Far Cry)
+  // ---------------------------------------------------------
+  let handMesh = null;
+  let isPunching = false;
+  let punchStartTime = 0;
+  let punchDuration = 0.25;
+
+  function createHand() {
+    // Создаём простую модель руки (кулак)
+    const handGroup = new THREE.Group();
+    
+    // Кулак
+    const fistGeo = new THREE.BoxGeometry(0.15, 0.12, 0.2);
+    const fistMat = new THREE.MeshStandardMaterial({ color: 0xd4a574, flatShading: true });
+    const fist = new THREE.Mesh(fistGeo, fistMat);
+    fist.castShadow = true;
+    handGroup.add(fist);
+    
+    // Предплечье
+    const armGeo = new THREE.CylinderGeometry(0.06, 0.07, 0.35, 8);
+    const armMat = new THREE.MeshStandardMaterial({ color: 0xd4a574, flatShading: true });
+    const arm = new THREE.Mesh(armGeo, armMat);
+    arm.rotation.x = Math.PI / 2;
+    arm.position.z = -0.2;
+    arm.castShadow = true;
+    handGroup.add(arm);
+    
+    handGroup.position.set(0.25, -0.2, -0.4);
+    handGroup.rotation.y = -0.1;
+    handGroup.rotation.x = 0.05;
+    
+    scene.add(handGroup);
+    return handGroup;
+  }
+
+  function initHand() {
+    if (!handMesh) {
+      handMesh = createHand();
+    }
+  }
+
+  function startPunch() {
+    if (isPunching || !handMesh) return;
+    isPunching = true;
+    punchStartTime = clock.getElapsedTime();
+  }
+
+  function updateHandAnimation(dt) {
+    if (!handMesh || !isPunching) return;
+    
+    const elapsed = clock.getElapsedTime() - punchStartTime;
+    
+    if (elapsed >= punchDuration) {
+      isPunching = false;
+      // Возвращаем руку в исходное положение
+      handMesh.position.set(0.25, -0.2, -0.4);
+      handMesh.rotation.set(0.05, -0.1, 0);
+      return;
+    }
+    
+    // Анимация удара: рука движется вперёд и немного вверх
+    const t = elapsed / punchDuration;
+    const punchProgress = Math.sin(t * Math.PI); // Плавное движение туда-обратно
+    
+    // Позиция во время удара
+    const forwardDist = 0.35 * punchProgress;
+    const upDist = 0.08 * punchProgress;
+    const rotateAngle = -0.3 * punchProgress;
+    
+    handMesh.position.z = -0.4 + forwardDist;
+    handMesh.position.y = -0.2 + upDist;
+    handMesh.rotation.x = 0.05 + rotateAngle;
+    handMesh.rotation.y = -0.1 - (0.15 * punchProgress);
+  }
+
+  // ---------------------------------------------------------
   // Способность: вспышка маны (ПКМ)
   // ---------------------------------------------------------
   function castFlare() {
@@ -666,6 +742,7 @@
     resetPlayerPosition();
     updateHUD();
     renderInventoryGrid();
+    initHand();
   }
 
   function die() {
@@ -743,8 +820,9 @@
       castFlare();
     }
     
-    // Check for target hit on left click (button 0) - works even when cheat console is closed but game is active
-    if (e.button === 0 && targets.length > 0 && !cheatConsoleOpen) {
+    // Punch animation on left click (button 0) - works even when cheat console is closed but game is active
+    if (e.button === 0 && !cheatConsoleOpen && isActive()) {
+      startPunch();
       checkTargetHit();
     }
   }
@@ -881,6 +959,7 @@
     } else if (isActive()) {
       updatePlayer(dt, elapsed);
       updateFlares(dt, elapsed);
+      updateHandAnimation(dt);
       updateHUD();
     }
 
@@ -1104,7 +1183,7 @@
     const material = new THREE.SpriteMaterial({ 
       map: texture, 
       transparent: true,
-      depthTest: false,
+      depthTest: true,
       depthWrite: false
     });
     const sprite = new THREE.Sprite(material);
@@ -1173,7 +1252,7 @@
     const material = new THREE.SpriteMaterial({ 
       map: texture, 
       transparent: true,
-      depthTest: false,
+      depthTest: true,
       depthWrite: false
     });
     const sprite = new THREE.Sprite(material);
