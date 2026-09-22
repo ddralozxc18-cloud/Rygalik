@@ -89,13 +89,12 @@
   // Ссылки на DOM
   // ---------------------------------------------------------
   const container = document.getElementById('game-container');
-  const menuScreen = document.getElementById('menu-screen');
+  const menuFrameContainer = document.getElementById('menu-frame-container');
   const pauseScreen = document.getElementById('pause-screen');
   const deathScreen = document.getElementById('death-screen');
   const inventoryScreen = document.getElementById('inventory-screen');
   const hudEl = document.getElementById('hud');
 
-  const startBtn = document.getElementById('start-btn');
   const resumeBtn = document.getElementById('resume-btn');
   const restartBtn = document.getElementById('restart-btn');
   const respawnBtn = document.getElementById('respawn-btn');
@@ -744,7 +743,7 @@
   function beginGame() {
     state.started = true;
     state.dead = false;
-    menuScreen.classList.add('hidden');
+    menuFrameContainer.classList.add('hidden');
     hudEl.classList.remove('hidden');
     resetPlayerPosition();
     updateHUD();
@@ -944,10 +943,14 @@
   }
 
   function bindEvents() {
-    startBtn.addEventListener('click', () => {
-      container.requestPointerLock();
-      if (!state.started) startGame();
+    // Слушаем сообщения от iframe меню
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'START_GAME') {
+        container.requestPointerLock();
+        if (!state.started) startGame();
+      }
     });
+    
     resumeBtn.addEventListener('click', () => container.requestPointerLock());
     restartBtn.addEventListener('click', fullReset);
     respawnBtn.addEventListener('click', respawn);
