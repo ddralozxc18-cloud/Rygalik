@@ -852,6 +852,11 @@
     
     if (intersects.length > 0) {
       const hitMesh = intersects[0].object;
+      const distance = intersects[0].distance;
+      
+      // Проверка дистанции: удар возможен только вблизи (максимум 2.5 единицы)
+      if (distance > 2.5) return;
+      
       const target = targets.find(t => t.mesh === hitMesh);
       if (target) {
         // Deal damage (e.g., 25 damage per hit) and show immediately
