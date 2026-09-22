@@ -996,6 +996,9 @@
           let count = targets.length;
           for (const target of targets) {
             scene.remove(target.mesh);
+            if (target.hpTextMesh) {
+              scene.remove(target.hpTextMesh);
+            }
             // Remove damage numbers
             if (target.damageNumbers) {
               for (const dn of target.damageNumbers) {
@@ -1062,11 +1065,11 @@
     mesh.receiveShadow = true;
     scene.add(mesh);
 
-    // Target object (no HP bar anymore)
+    // Target object (no HP bar anymore, only text value)
     const target = {
       type: type,
       mesh: mesh,
-      hpBarGroup: null,
+      hpTextMesh: null,
       hp: 100,
       maxHp: 100,
       hpRegen: 2,
@@ -1078,14 +1081,17 @@
       damageNumbers: []
     };
 
+    // Create HP text above target
+    const hpTextMesh = createHPText(`${target.hp}/${target.maxHp}`);
+    hpTextMesh.position.copy(spawnPos);
+    hpTextMesh.position.y += 1.3;
+    scene.add(hpTextMesh);
+    target.hpTextMesh = hpTextMesh;
+
     targets.push(target);
   }
 
-  function createHPBar(text) {
-    const group = new THREE.Group();
-    
-    // Text label only (no HP bar)
-    const textGeo = new THREE.PlaneGeometry(1.5, 0.4);
+  function createHPText(text) {
     const canvas = document.createElement('canvas');
     canvas.width = 256;
     canvas.height = 64;
@@ -1094,33 +1100,52 @@
     ctx.font = 'bold 32px Arial';
     ctx.textAlign = 'center';
     ctx.fillText(text, 128, 44);
-    const textTexture = new THREE.CanvasTexture(canvas);
-    const textMat = new THREE.MeshBasicMaterial({ 
-      map: textTexture, 
-      transparent: true, 
-      side: THREE.DoubleSide,
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({ 
+      map: texture, 
+      transparent: true,
       depthTest: false,
       depthWrite: false
     });
-    const textMesh = new THREE.Mesh(textGeo, textMat);
-    textMesh.position.set(0, 0, 0.02);
-    textMesh.renderOrder = 1001;
-    textMesh.name = 'hpText';
-    textMesh.userData.currentText = text;
-    group.add(textMesh);
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(1.5, 0.6, 1);
+    sprite.renderOrder = 1001;
+    sprite.userData.currentText = text;
+    return sprite;
+  }
 
-    // Store references for updates
-    group.userData = { 
-      hpText: textMesh,
-      lastHpValue: text
-    };
-
-    return group;
+  function updateHPText(target) {
+    if (!target.hpTextMesh) return;
+    
+    const newText = `${Math.floor(target.hp)}/${target.maxHp}`;
+    const currentText = target.hpTextMesh.userData.currentText || '';
+    
+    if (newText !== currentText) {
+      // Update texture
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 32px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(newText, 128, 44);
+      
+      target.hpTextMesh.material.map.dispose();
+      target.hpTextMesh.material.map = new THREE.CanvasTexture(canvas);
+      target.hpTextMesh.material.needsUpdate = true;
+      target.hpTextMesh.userData.currentText = newText;
+    }
+    
+    // Make HP text face camera
+    target.hpTextMesh.position.copy(target.mesh.position);
+    target.hpTextMesh.position.y += 1.3;
   }
 
   function updateHPBars() {
     for (const target of targets) {
-      // Skip HP bar updates since we removed them
+      // Update HP text display
+      updateHPText(target);
       
       // Regen
       const now = clock.getElapsedTime();
@@ -1157,11 +1182,6 @@
     sprite.position.y += 1.5;
     sprite.renderOrder = 2000;
     
-    // Make damage number face player immediately
-    const playerDir = new THREE.Vector3();
-    camera.getWorldDirection(playerDir);
-    sprite.lookAt(camera.position);
-    
     scene.add(sprite);
 
     target.damageNumbers.push({
@@ -1185,7 +1205,7 @@
         continue;
       }
 
-      // Make damage number face camera (Sprites always face camera by default)
+      // Make damage number always face camera (Sprites do this automatically)
       // Move up and fade
       dn.mesh.position.y += 0.05;
       const opacity = 1 - (age / dn.lifetime);
@@ -1212,7 +1232,9 @@
         targets.splice(index, 1);
       }
       scene.remove(target.mesh);
-      scene.remove(target.hpBarGroup);
+      if (target.hpTextMesh) {
+        scene.remove(target.hpTextMesh);
+      }
       
       // Clean up damage numbers
       for (const dn of target.damageNumbers) {
