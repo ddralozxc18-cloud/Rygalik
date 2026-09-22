@@ -512,9 +512,12 @@
     const equipmentSection = document.createElement('div');
     equipmentSection.className = 'equipment-section';
     
-    // Слот руки
+    // Ряд с рукой
+    const handRow = document.createElement('div');
+    handRow.className = 'equipment-row';
     const handSlot = createEquipmentSlot('hand', equipmentState.hand, 'Рука');
-    equipmentSection.appendChild(handSlot);
+    handRow.appendChild(handSlot);
+    equipmentSection.appendChild(handRow);
 
     // Активные слоты (Shift и C)
     const activeSlotsContainer = document.createElement('div');
@@ -861,6 +864,7 @@
 
   function beginGame() {
     state.started = true;
+    state.paused = false;
     state.dead = false;
     menuFrameContainer.classList.add('hidden');
     hudEl.classList.remove('hidden');
@@ -960,13 +964,13 @@
   }
 
   function onMouseDown(e) {
-    if (e.button === 2 && document.pointerLockElement === container && state.started && !state.paused && !state.dead) {
+    if (e.button === 2 && document.pointerLockElement === container && isActive()) {
       castFlare();
     }
     
     // Punch animation on left click (button 0) - works when game is active (not paused/dead)
     // Allow punching even when cheat console is open
-    if (e.button === 0 && state.started && !state.paused && !state.dead) {
+    if (e.button === 0 && isActive()) {
       startPunch();
       checkTargetHit();
     }
@@ -1006,6 +1010,11 @@
       state.paused = true;
       state.keys = {};
       pauseScreen.classList.remove('hidden');
+    }
+    
+    // Обновляем меню паузы, чтобы синхронизировать значение чувствительности
+    if (sensSliderPause) {
+      sensSliderPause.value = state.mouseSensitivity;
     }
   }
 
@@ -1047,7 +1056,7 @@
     // Обработка клавиш для активных слотов (Shift и C)
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
       e.preventDefault();
-      if (equipmentState.active1 && equipmentState.active1.use) {
+      if (isActive() && equipmentState.active1 && equipmentState.active1.use) {
         equipmentState.active1.use(state);
         updateHUD();
       }
@@ -1055,7 +1064,7 @@
     }
     if (e.code === 'KeyC') {
       e.preventDefault();
-      if (equipmentState.active2 && equipmentState.active2.use) {
+      if (isActive() && equipmentState.active2 && equipmentState.active2.use) {
         equipmentState.active2.use(state);
         updateHUD();
       }
@@ -1095,7 +1104,7 @@
     window.addEventListener('message', (event) => {
       if (event.data && event.data.type === 'START_GAME') {
         container.requestPointerLock();
-        if (!state.started) startGame();
+        if (!state.started) beginGame();
       }
     });
     
