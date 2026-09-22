@@ -87,7 +87,7 @@ html, body{
 .menu-card::-webkit-scrollbar{ width: 6px; }
 .menu-card::-webkit-scrollbar-thumb{ background: var(--panel-border); border-radius: 3px; }
 
-.sunser-title{
+.rygalik-title{
   font-size: 56px;
   letter-spacing: 0.15em;
   margin-bottom: 4px;
