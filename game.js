@@ -996,7 +996,6 @@
           let count = targets.length;
           for (const target of targets) {
             scene.remove(target.mesh);
-            if (target.hpBarGroup) scene.remove(target.hpBarGroup);
             // Remove damage numbers
             if (target.damageNumbers) {
               for (const dn of target.damageNumbers) {
@@ -1063,17 +1062,11 @@
     mesh.receiveShadow = true;
     scene.add(mesh);
 
-    // Create HP bar above target
-    const hpBarGroup = createHPBar(isSuperBob ? '∞' : '100/100');
-    hpBarGroup.position.copy(spawnPos);
-    hpBarGroup.position.y += 2.5;
-    scene.add(hpBarGroup);
-
-    // Target object
+    // Target object (no HP bar anymore)
     const target = {
       type: type,
       mesh: mesh,
-      hpBarGroup: hpBarGroup,
+      hpBarGroup: null,
       hp: 100,
       maxHp: 100,
       hpRegen: 2,
@@ -1127,32 +1120,8 @@
 
   function updateHPBars() {
     for (const target of targets) {
-      // Position HP bar above target
-      target.hpBarGroup.position.copy(target.mesh.position);
-      target.hpBarGroup.position.y += 2.5;
+      // Skip HP bar updates since we removed them
       
-      // Make HP bar face camera - rotate only around Y axis
-      const dx = camera.position.x - target.hpBarGroup.position.x;
-      const dz = camera.position.z - target.hpBarGroup.position.z;
-      const angle = Math.atan2(dx, dz);
-      target.hpBarGroup.rotation.y = angle;
-
-      // Update text only when HP changes
-      const hpText = target.hpBarGroup.userData.hpText;
-      const currentText = target.isImmortal ? '∞' : `${Math.ceil(target.hp)}/${target.maxHp}`;
-      if (hpText.userData.currentText !== currentText) {
-        const canvas = hpText.material.map.image;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 32px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(currentText, 128, 44);
-        hpText.material.map.needsUpdate = true;
-        hpText.userData.currentText = currentText;
-      }
-
       // Regen
       const now = clock.getElapsedTime();
       if (now - target.lastRegenTime >= 1 && target.hp < target.maxHp) {
@@ -1187,6 +1156,12 @@
     sprite.position.copy(target.mesh.position);
     sprite.position.y += 1.5;
     sprite.renderOrder = 2000;
+    
+    // Make damage number face player immediately
+    const playerDir = new THREE.Vector3();
+    camera.getWorldDirection(playerDir);
+    sprite.lookAt(camera.position);
+    
     scene.add(sprite);
 
     target.damageNumbers.push({
