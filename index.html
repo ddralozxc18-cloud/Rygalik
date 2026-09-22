@@ -16,31 +16,10 @@
 
   <!-- ===== Главное меню ===== -->
   <div id="menu-screen" class="screen">
-    <div class="menu-card">
-      <h1 class="menu-title rygalik-title">RYGALIK</h1>
-      <p class="menu-eyebrow">бродилка от первого лица</p>
-      <p class="menu-subtitle">Низкополигональные земли ждут своего скитальца</p>
-
-      <button id="start-btn" class="btn-primary">НАЧАТЬ ИГРУ</button>
-      
-      <div class="menu-controls">
-        <h2>Управление</h2>
-        <ul>
-          <li><span class="key">W A S D</span><span class="key-desc">движение</span></li>
-          <li><span class="key">Space</span><span class="key-desc">прыжок</span></li>
-          <li><span class="key">ПКМ</span><span class="key-desc">вспышка — тратит ману</span></li>
-          <li><span class="key">E</span><span class="key-desc">поднять предмет</span></li>
-          <li><span class="key">I</span><span class="key-desc">инвентарь</span></li>
-          <li><span class="key">Esc</span><span class="key-desc">пауза</span></li>
-        </ul>
-      </div>
-
-      <label class="sens-label">
-        <span>Чувствительность мыши</span>
-        <input type="range" id="sensitivity-slider" min="0.3" max="3" step="0.1" value="1">
-      </label>
-
-      <p class="menu-footnote">Клик по кнопке захватит курсор мыши для обзора</p>
+    <div class="menu-card-main">
+      <h1 class="menu-title-gold">Rygalik</h1>
+      <button id="start-btn" class="btn-start-game">начать игру</button>
+      <div class="pre-alpha">Pre-Alpha</div>
     </div>
   </div>
 
@@ -52,6 +31,10 @@
       <label class="sens-label">
         <span>Чувствительность мыши</span>
         <input type="range" id="sensitivity-slider-pause" min="0.3" max="3" step="0.1" value="1">
+      </label>
+      <label class="fps-toggle-label">
+        <input type="checkbox" id="fps-toggle" checked>
+        <span>Счетчик FPS</span>
       </label>
       <button id="restart-btn" class="btn-secondary">Начать заново</button>
     </div>

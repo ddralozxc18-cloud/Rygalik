@@ -101,7 +101,6 @@
   const respawnBtn = document.getElementById('respawn-btn');
   const closeInventoryBtn = document.getElementById('close-inventory-btn');
 
-  const sensSlider = document.getElementById('sensitivity-slider');
   const sensSliderPause = document.getElementById('sensitivity-slider-pause');
 
   const hpFillEl = document.getElementById('hp-fill');
@@ -818,7 +817,6 @@
   // ---------------------------------------------------------
   function onSensitivityChange(e) {
     state.mouseSensitivity = parseFloat(e.target.value);
-    sensSlider.value = state.mouseSensitivity;
     sensSliderPause.value = state.mouseSensitivity;
   }
 
@@ -941,13 +939,20 @@
   }
 
   function bindEvents() {
-    startBtn.addEventListener('click', () => container.requestPointerLock());
+    startBtn.addEventListener('click', () => {
+      container.requestPointerLock();
+      if (!state.started) startGame();
+    });
     resumeBtn.addEventListener('click', () => container.requestPointerLock());
     restartBtn.addEventListener('click', fullReset);
     respawnBtn.addEventListener('click', respawn);
     closeInventoryBtn.addEventListener('click', toggleInventory);
 
-    sensSlider.addEventListener('input', onSensitivityChange);
+    const fpsToggle = document.getElementById('fps-toggle');
+    fpsToggle.addEventListener('change', (e) => {
+      fpsCounterEl.style.display = e.target.checked ? 'block' : 'none';
+    });
+
     sensSliderPause.addEventListener('input', onSensitivityChange);
 
     document.addEventListener('pointerlockchange', onPointerLockChange);

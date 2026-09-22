@@ -67,6 +67,58 @@ html, body{
   animation: fade-in 0.35s ease both;
 }
 
+/* Главное меню - чёрный фон */
+#menu-screen {
+  background: #000000;
+  backdrop-filter: none;
+}
+
+.menu-card-main {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+  text-align: center;
+}
+
+.menu-title-gold {
+  font-family: var(--font-display);
+  font-size: 72px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--gold-bright);
+  text-shadow: 0 2px 18px rgba(201,162,39,0.35);
+  margin: 0 0 40px;
+  text-align: center;
+}
+
+.btn-start-game {
+  display: block;
+  margin: 0 auto;
+  padding: 16px 48px;
+  font-family: var(--font-body);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: transform 0.12s ease, filter 0.12s ease;
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+  border: 1px solid rgba(0,0,0,0.2);
+  color: #201804;
+}
+.btn-start-game:hover { filter: brightness(1.1); }
+.btn-start-game:active { transform: scale(0.98); }
+
+.pre-alpha {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  font-size: 12px;
+  color: var(--gold);
+  opacity: 0.7;
+  letter-spacing: 0.1em;
+}
+
 @keyframes fade-in{
   from{ opacity: 0; }
   to{ opacity: 1; }
@@ -178,6 +230,22 @@ html, body{
 .sens-label input[type="range"]{
   width: 100%;
   accent-color: var(--gold);
+}
+
+.fps-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-bottom: 22px;
+  cursor: pointer;
+}
+.fps-toggle-label input[type="checkbox"] {
+  accent-color: var(--gold);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
 }
 
 .btn-primary, .btn-secondary{
