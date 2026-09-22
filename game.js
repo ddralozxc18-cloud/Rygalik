@@ -539,7 +539,7 @@
     const punchProgress = Math.sin(t * Math.PI); // Плавное движение туда-обратно
     
     // Позиция во время удара
-    const forwardDist = 0.35 * punchProgress;
+    const forwardDist = 0.15 * punchProgress;
     const upDist = 0.08 * punchProgress;
     const rotateAngle = -0.3 * punchProgress;
     
