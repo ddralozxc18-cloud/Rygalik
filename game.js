@@ -846,12 +846,14 @@
   function checkTargetHit() {
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    raycaster.far = 2.5; // Ограничиваем дальность проверки луча
     
     const targetMeshes = targets.map(t => t.mesh);
     const intersects = raycaster.intersectObjects(targetMeshes);
     
     if (intersects.length > 0) {
       const hitMesh = intersects[0].object;
+      
       const target = targets.find(t => t.mesh === hitMesh);
       if (target) {
         // Deal damage (e.g., 25 damage per hit) and show immediately
