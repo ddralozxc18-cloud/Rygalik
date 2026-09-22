@@ -102,6 +102,7 @@
   const closeInventoryBtn = document.getElementById('close-inventory-btn');
 
   const sensSliderPause = document.getElementById('sensitivity-slider-pause');
+  const fpsToggle = document.getElementById('fps-toggle');
 
   const hpFillEl = document.getElementById('hp-fill');
   const hpValueEl = document.getElementById('hp-value');
@@ -378,6 +379,10 @@
   }
 
   function updateFpsCounter(dt) {
+    if (!fpsToggle || !fpsToggle.checked) {
+      fpsCounterEl.textContent = '';
+      return;
+    }
     fpsAccum += dt; fpsFrames++; fpsTimer += dt;
     if (fpsTimer > 0.5) {
       fpsCounterEl.textContent = Math.round(fpsFrames / fpsAccum) + ' fps';
@@ -954,6 +959,7 @@
     });
 
     sensSliderPause.addEventListener('input', onSensitivityChange);
+    fpsToggle.addEventListener('change', () => {});
 
     document.addEventListener('pointerlockchange', onPointerLockChange);
     document.addEventListener('pointerlockerror', () => console.warn('Не удалось захватить курсор'));
