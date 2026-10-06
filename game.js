@@ -13,7 +13,19 @@ const CONFIG = {
   gravity: -22,
   jumpSpeed: 8,
   jumpStaminaCost: 0,
-  walkSpeed: 4.3,
+  // --- Параметры движения в стиле Source Engine (Valve) ---
+  // Максимальная скорость на земле (аналог sv_maxspeed)
+  maxSpeed: 4.3,
+  // Ускорение на земле (аналог sv_accelerate)
+  groundAccelerate: 40,
+  // Искусственно ограниченный wishspeed в воздухе — позволяет
+  // разгоняться только зигзагами (strafe-акселерация)
+  airWishSpeed: 0.2,          // ~30 units/sec в терминах Source (30/u_scale)
+  // Ускорение в воздухе (аналог sv_airaccelerate, обычно 10–15)
+  airAccelerate: 12,
+  // Коэффициенты трения Source (friction / stopspeed)
+  friction: 10,
+  stopSpeed: 1.0,
   manaRegenRate: 4,
   flareManaCost: 18,
   hpRegenRate: 1.6,
@@ -80,6 +92,10 @@ const state = {
   lastDamageTime: -999,
   onGround: true,
   velocityY: 0,
+  // Горизонтальная скорость (милли-единицы Source): {x, z} в юнитах/сек
+  velocity: { x: 0, z: 0 },
+  // Буфер ввода прыжка (jump-bug): «прыжок был нажат» с последнего кадра
+  jumpQueued: false,
   bobTimer: 0,
   bobOffset: 0,
   keys: {},
@@ -701,6 +717,51 @@ function isActive() {
   return state.started && !state.paused && !state.inventoryOpen && !state.dead && !cheatConsoleOpen;
 }
 
+// ---------------------------------------------------------
+// Физика движения в стиле Valve Source Engine
+// ---------------------------------------------------------
+
+// Аналог CMovement::Accelerate из SDK Source (vphysics).
+// Ключевая идея: ограничивается НЕ абсолютная скорость, а её
+// ПРОЕКЦИЯ на направление желаемого движения (wishdir). Поэтому
+// при зигзагообразном движении (strafe) в воздухе можно набирать
+// скорость выше wishspeed — классическая стрейф-акселерация.
+function accelerate(wishdir, wishspeed, accel, deltaTime) {
+  const vel = state.velocity;
+  // currentspeed = Dot Product текущей скорости и направления желания
+  const currentspeed = vel.x * wishdir.x + vel.z * wishdir.z;
+  // Прирост скорости ограничен разницей между желаемой и проекцией
+  const addspeed = wishspeed - currentspeed;
+  if (addspeed <= 0) return;
+  // Сколько реально можем добавить за этот кадр
+  let accelspeed = accel * deltaTime * wishspeed;
+  if (accelspeed > addspeed) accelspeed = addspeed;
+  // velocity += wishdir * accelspeed
+  vel.x += wishdir.x * accelspeed;
+  vel.z += wishdir.z * accelspeed;
+}
+
+// Аналог CMovement::ApplyFriction из SDK Source.
+// Уменьшает горизонтальную скорость пропорционально её величине.
+function applyFriction(deltaTime) {
+  const vel = state.velocity;
+  const speed = Math.hypot(vel.x, vel.z);
+  if (speed < 0.001) {
+    vel.x = 0;
+    vel.z = 0;
+    return;
+  }
+  // control = max(speed, stopspeed)
+  const control = Math.max(speed, CONFIG.stopSpeed);
+  // frictionfactor = control * (friction * frametime)
+  const frictionFactor = control * (CONFIG.friction * deltaTime);
+  // drop = speed * frictionfactor, но не более самой скорости
+  const drop = speed * Math.min(frictionFactor, 1);
+  const retain = Math.max(0, speed - drop) / speed;
+  vel.x *= retain;
+  vel.z *= retain;
+}
+
 function updatePlayer(dt, elapsed) {
   const forward = new THREE.Vector3(-Math.sin(camera.rotation.y), 0, -Math.cos(camera.rotation.y));
   const right = new THREE.Vector3(Math.cos(camera.rotation.y), 0, -Math.sin(camera.rotation.y));
@@ -710,19 +771,65 @@ function updatePlayer(dt, elapsed) {
   if (state.keys['KeyD']) moveX += 1;
   if (state.keys['KeyA']) moveX -= 1;
   const isMoving = moveX !== 0 || moveZ !== 0;
-  const speed = CONFIG.walkSpeed;
+
+  // --- Формируем wishdir (направление желаемого движения) ---
+  let wishdirX = 0, wishdirZ = 0;
   if (isMoving) {
-    const len = Math.hypot(moveX, moveZ);
-    moveX /= len; moveZ /= len;
-    const dx = (forward.x * moveZ + right.x * moveX) * speed * dt;
-    const dz = (forward.z * moveZ + right.z * moveX) * speed * dt;
-    const next = new THREE.Vector3(camera.position.x + dx, 0, camera.position.z + dz);
-    resolveCollisions(next);
-    next.x = clamp(next.x, -CONFIG.worldBound, CONFIG.worldBound);
-    next.z = clamp(next.z, -CONFIG.worldBound, CONFIG.worldBound);
-    camera.position.x = next.x;
-    camera.position.z = next.z;
+    wishdirX = forward.x * moveZ + right.x * moveX;
+    wishdirZ = forward.z * moveZ + right.z * moveX;
+    const len = Math.hypot(wishdirX, wishdirZ);
+    if (len > 0.0001) { wishdirX /= len; wishdirZ /= len; }
   }
+  const wishspeed = CONFIG.maxSpeed;
+
+  // --- GroundMove / AirMove (как в player.cpp Source) ---
+  // Активен ли прыжок: клавиша зажата ИЛИ находится в буфере ввода
+  const jumpHeld = !!state.keys['Space'] || state.jumpQueued;
+  if (state.onGround) {
+    // Bunnyhop: если в момент приземления активна клавиша прыжка,
+    // пропускаем фазу трения этого кадра — накопленная горизонтальная
+    // скорость сохраняется, и сразу выдаётся импульс прыжка вверх.
+    if (jumpHeld) {
+      state.velocityY = CONFIG.jumpSpeed;
+      state.onGround = false;
+      state.jumpQueued = false;
+    } else {
+      // На земле: сначала трение (Friction), уменьшающее velocity,
+      // затем accelerate() с обычными высокими параметрами
+      applyFriction(dt);
+      if (isMoving) {
+        accelerate({ x: wishdirX, z: wishdirZ }, wishspeed, CONFIG.groundAccelerate, dt);
+      }
+    }
+  } else {
+    // В воздухе: трение полностью отключено.
+    // wishspeed искусственно ограничен очень маленьким значением,
+    // airAccelerate ~ 10–15 (sv_airaccelerate). Это не даёт разогнаться
+    // по прямой, но позволяет набирать скорость зигзагами при
+    // синхронном повороте мыши и зажатии стрейфов (A или D).
+    if (isMoving) {
+      accelerate({ x: wishdirX, z: wishdirZ }, CONFIG.airWishSpeed, CONFIG.airAccelerate, dt);
+    }
+  }
+
+  // --- Интегрирование горизонтальной скорости в позицию ---
+  const next = new THREE.Vector3(
+    camera.position.x + state.velocity.x * dt,
+    0,
+    camera.position.z + state.velocity.z * dt
+  );
+  resolveCollisions(next);
+  next.x = clamp(next.x, -CONFIG.worldBound, CONFIG.worldBound);
+  next.z = clamp(next.z, -CONFIG.worldBound, CONFIG.worldBound);
+  // Если столкновение «съело» движение — гасим скорость по этой оси,
+  // чтобы не «тереться» об препятствие (аналог ClipVelocity)
+  const expectedX = camera.position.x + state.velocity.x * dt;
+  const expectedZ = camera.position.z + state.velocity.z * dt;
+  if (Math.abs(next.x - expectedX) > 1e-6) state.velocity.x = 0;
+  if (Math.abs(next.z - expectedZ) > 1e-6) state.velocity.z = 0;
+  camera.position.x = next.x;
+  camera.position.z = next.z;
+
   // Мана и здоровье
   state.mana = Math.min(state.maxMana, state.mana + CONFIG.manaRegenRate * dt);
   if (elapsed - state.lastDamageTime > CONFIG.hpRegenDelay) {
@@ -733,7 +840,7 @@ function updatePlayer(dt, elapsed) {
   const manaRegenDisplay = CONFIG.manaRegenRate;
   hpRegenEl.textContent = '+' + hpRegenDisplay.toFixed(1) + '/сек';
   manaRegenEl.textContent = '+' + manaRegenDisplay.toFixed(1) + '/сек';
-  // Вертикальная физика (гравитация и прыжок)
+  // Вертикальная физика (гравитация и приземление)
   state.velocityY += CONFIG.gravity * dt;
   let newY = camera.position.y - state.bobOffset + state.velocityY * dt;
   if (newY <= CONFIG.eyeHeight) {
@@ -742,16 +849,32 @@ function updatePlayer(dt, elapsed) {
       if (impact > CONFIG.fallDamageThreshold) {
         applyDamage((impact - CONFIG.fallDamageThreshold) * CONFIG.fallDamageMultiplier);
       }
+      // Bunnyhop: в момент приземления, если клавиша прыжка активна
+      // (зажата или находится в буфере ввода), пропускаем фазу трения
+      // этого кадра — горизонтальная скорость сохраняется целиком,
+      // и сразу придаётся импульс прыжка вверх.
+      if (jumpHeld && impact <= CONFIG.fallDamageThreshold) {
+        state.velocityY = CONFIG.jumpSpeed;
+        newY = CONFIG.eyeHeight;
+        state.onGround = true;
+        state.jumpQueued = false;
+      } else {
+        newY = CONFIG.eyeHeight;
+        state.velocityY = 0;
+        state.onGround = true;
+      }
+    } else {
+      newY = CONFIG.eyeHeight;
+      state.velocityY = 0;
+      state.onGround = true;
     }
-    newY = CONFIG.eyeHeight;
-    state.velocityY = 0;
-    state.onGround = true;
   } else {
     state.onGround = false;
   }
-  // Покачивание камеры при ходьбе
+  // Покачивание камеры при ходьбе (амплитуда зависит от скорости)
+  const horizSpeed = Math.hypot(state.velocity.x, state.velocity.z);
   if (state.onGround && isMoving) {
-    state.bobTimer += dt * 8.4;
+    state.bobTimer += dt * 8.4 * clamp(horizSpeed / CONFIG.maxSpeed, 0.3, 2);
     state.bobOffset = Math.sin(state.bobTimer) * 0.05;
     // Воспроизведение звуков шагов
     const stepInterval = 0.5;
@@ -794,6 +917,9 @@ function resetPlayerPosition() {
   camera.position.set(0, CONFIG.eyeHeight, 6);
   camera.rotation.set(0, 0, 0);
   state.velocityY = 0;
+  state.velocity.x = 0;
+  state.velocity.z = 0;
+  state.jumpQueued = false;
   state.onGround = true;
   state.bobOffset = 0;
   state.bobTimer = 0;
@@ -1015,11 +1141,19 @@ function onKeyDown(e) {
   if (!isActive()) return;
   if (e.code === 'Space') {
     e.preventDefault();
+    // Прыжок обрабатывается в физическом цикле (updatePlayer), чтобы
+    // корректно работать с bunnyhop: на приземлении фазовая проверка
+    // «прыжок активен» выполняется до применения трения.
+    // Здесь — мгновенный прыжок, если игрок уже на земле, и запись
+    // в буфер ввода (jump-queue) для случаев точного тайинга.
     if (state.onGround) {
       state.velocityY = CONFIG.jumpSpeed;
       state.onGround = false;
-      // Прыжки не тратят стамину
+      state.jumpQueued = false;
+    } else {
+      state.jumpQueued = true;
     }
+    // Прыжки не тратят стамину
     return;
   }
   if (e.code === 'KeyE') {
