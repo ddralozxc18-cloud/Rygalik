@@ -32,3 +32,26 @@ function rollSpellChoices(player, options = {}) {
 
   // 3. Опции апгрейда (отдельный список)
   const upgrades = [];
+  for (const spellId in player.learnedSpells) {
+    if (canUpgrade(spellId)) {
+      upgrades.push({ kind: 'upgrade', spell: SPELLS_DB[spellId] });
+    }
+  }
+
+  return { choices: shuffle(choices), upgrades };
+}
+
+// Ролл скилла конкретной редкости (для сундуков)
+function rollSpellOfRarity(rarityId, options = {}) {
+  const pool = SPELLS_BY_RARITY[rarityId] || [];
+  if (pool.length === 0) return null;
+  const filtered = pool.filter(id => {
+    const s = SPELLS_DB[id];
+    return options.allowHidden || !s.hidden;
+  });
+  if (filtered.length === 0) return null;
+  return { ...SPELLS_DB[pick(filtered)], isSpell: true };
+}
+
+window.rollSpellChoices = rollSpellChoices;
+window.rollSpellOfRarity = rollSpellOfRarity;
