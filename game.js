@@ -103,6 +103,12 @@ const state = {
   nearestPickup: null,
   inventory: {},
   gems: 0,
+  // --- Врождённая магия (выбирается на старте) ---
+  innateSchool: null,      // 'fire' | 'space' | 'luck'
+  innateAbilityId: null,   // id врождённой способности из INNATE_ABILITIES
+  // --- Parkour (space): двойной прыжок ---
+  airJumpsUsed: 0,         // сколько прыжков в воздухе использовано
+  lastJumpTime: -999,      // время последнего прыжка (для снаряда)
 };
 
 // ---------------------------------------------------------
@@ -164,6 +170,7 @@ let scene, camera, renderer, clock;
 const collectibles = [];
 const obstacles = [];
 const flares = [];
+const parkourShots = []; // снаряды двойного прыжка (space)
 const targets = []; // Массив мишеней bob/superbob
 let damageFlashTimeout = null;
 let fpsAccum = 0, fpsFrames = 0, fpsTimer = 0;
@@ -444,6 +451,8 @@ function flashDamage() {
 
 function applyDamage(amount) {
   if (amount <= 0 || state.dead) return;
+  // Ambassador of Luck: входящий урон тоже рандомизирован ±10%
+  if (typeof rollLuckDamage === 'function') amount = rollLuckDamage(amount);
   state.hp = Math.max(0, state.hp - amount);
   state.lastDamageTime = clock.getElapsedTime();
   flashDamage();
@@ -560,8 +569,9 @@ function createEquipmentSlot(slotName, item, tooltipText) {
   if (item) {
     slot.classList.add('filled');
     slot.style.color = item.color || '#eae6da';
+    const tip = item.tooltip ? (item.name + ' — ' + item.tooltip) : (item.name || tooltipText);
     slot.innerHTML = (item.icon || '?') +
-      '<span class="equip-tooltip">' + (item.name || tooltipText) + '</span>';
+      '<span class="equip-tooltip">' + tip + '</span>';
   } else {
     slot.innerHTML = '<span class="slot-empty">+</span>' +
       '<span class="equip-tooltip">' + tooltipText + '</span>';
@@ -647,6 +657,188 @@ function updateHandAnimation(dt) {
 }
 
 // ---------------------------------------------------------
+// Прыжки и врождённые способности
+// ---------------------------------------------------------
+// Есть ли у игрока врождённая способность с данным id
+function hasInnateAbility(abilityId) {
+  return !!state.innateSchool && state.innateAbilityId === abilityId;
+}
+
+// Совершить прыжок. isDouble — второй прыжок в воздухе (Parkour):
+// вниз вылетает снаряд с уроном = урон руки ×2
+function doJump(isDouble) {
+  state.velocityY = CONFIG.jumpSpeed;
+  state.onGround = false;
+  state.jumpQueued = false;
+  state.lastJumpTime = clock ? clock.getElapsedTime() : 0;
+  if (isDouble) spawnParkourProjectile();
+}
+
+// Снаряд «Parkour»: летит вертикально вниз от ног игрока
+function spawnParkourProjectile() {
+  const geo = new THREE.SphereGeometry(0.16, 8, 6);
+  const mat = new THREE.MeshBasicMaterial({ color: 0xb08cff, transparent: true, opacity: 0.95 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.copy(camera.position);
+  mesh.position.y -= CONFIG.eyeHeight * 0.5;
+  const light = new THREE.PointLight(0x8f6bff, 1.0, 6);
+  mesh.add(light);
+  scene.add(mesh);
+  parkourShots.push({
+    mesh,
+    dir: new THREE.Vector3(0, -1, 0),
+    speed: 16,
+    born: clock.getElapsedTime(),
+    damage: getHandDamage() * 2,
+  });
+}
+
+function updateParkourShots(dt, elapsed) {
+  for (let i = parkourShots.length - 1; i >= 0; i--) {
+    const p = parkourShots[i];
+    const age = elapsed - p.born;
+    if (age > 2.5) {
+      scene.remove(p.mesh);
+      parkourShots.splice(i, 1);
+      continue;
+    }
+    p.mesh.position.addScaledVector(p.dir, p.speed * dt);
+    // Снаряд упёрся в землю — взрыв по площади
+    if (p.mesh.position.y <= 0.15) {
+      explodeParkourShot(p);
+      scene.remove(p.mesh);
+      parkourShots.splice(i, 1);
+      continue;
+    }
+    // Попадание по цели
+    for (const target of targets) {
+      const dist = p.mesh.position.distanceTo(target.mesh.position);
+      if (dist < 1.3) {
+        explodeParkourShot(p);
+        scene.remove(p.mesh);
+        parkourShots.splice(i, 1);
+        break;
+      }
+    }
+  }
+}
+
+// Взрыв снаряда: урон = урон руки ×2 (с учётом Ambassador of Luck)
+function explodeParkourShot(shot) {
+  let dmg = shot.damage;
+  if (typeof rollLuckDamage === 'function') dmg = rollLuckDamage(dmg);
+  for (const target of targets.slice()) {
+    const dist = shot.mesh.position.distanceTo(target.mesh.position);
+    if (dist < 2.2) applyDamageToTarget(target, Math.max(1, Math.round(dmg)));
+  }
+  // Короткая вспышка на месте взрыва
+  const flashMat = new THREE.MeshBasicMaterial({ color: 0xb08cff, transparent: true, opacity: 0.85 });
+  const flash = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), flashMat);
+  flash.position.copy(shot.mesh.position);
+  flash.position.y = Math.max(0.2, flash.position.y);
+  scene.add(flash);
+  scorchPulses.push({ mesh: flash, born: clock.getElapsedTime(), duration: 0.3 });
+}
+
+// ---------------------------------------------------------
+// Scorching Flame (аналог Radiance из Dota 2):
+// аура ожога — постоянный урон по всем целям рядом с игроком
+// ---------------------------------------------------------
+const SCORCH = { radius: 7, tickInterval: 0.55, baseDamagePerTick: 3 };
+// Параметры ауры можно переопределить из data/schools.js (INNATE_ABILITIES.fire)
+function getScorchParams() {
+  const a = (typeof INNATE_ABILITIES !== 'undefined' && INNATE_ABILITIES.fire) || {};
+  return {
+    radius: a.radius ?? SCORCH.radius,
+    tickInterval: a.tickInterval ?? SCORCH.tickInterval,
+    damagePerTick: a.damagePerTick ?? SCORCH.baseDamagePerTick,
+  };
+}
+let scorchTickAccum = 0;
+const scorchPulses = []; // визуальные импульсы ауры
+
+function updateScorchAura(dt) {
+  if (!hasInnateAbility('scorching_flame')) return;
+  const params = getScorchParams();
+  scorchTickAccum += dt;
+  if (scorchTickAccum < params.tickInterval) return;
+  scorchTickAccum = 0;
+  let hitAny = false;
+  for (const target of targets.slice()) {
+    const dx = camera.position.x - target.mesh.position.x;
+    const dz = camera.position.z - target.mesh.position.z;
+    const dy = camera.position.y - target.mesh.position.y;
+    if (Math.hypot(dx, dy, dz) <= params.radius) {
+      let dmg = params.damagePerTick;
+      if (typeof rollLuckDamage === 'function') dmg = rollLuckDamage(dmg);
+      applyDamageToTarget(target, Math.max(1, Math.round(dmg)));
+      hitAny = true;
+    }
+  }
+  if (hitAny) {
+    // Оранжевая волна, расходящаяся от игрока — индикация ауры
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0xff7a2a, transparent: true, opacity: 0.35, side: THREE.DoubleSide,
+    });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.6, 0.85, 32), ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(camera.position.x, 0.06, camera.position.z);
+    scene.add(ring);
+    scorchPulses.push({ mesh: ring, born: clock.getElapsedTime(), duration: 0.6 });
+  }
+}
+
+function updateScorchPulses(dt, elapsed) {
+  for (let i = scorchPulses.length - 1; i >= 0; i--) {
+    const p = scorchPulses[i];
+    const age = elapsed - p.born;
+    if (age >= p.duration) {
+      scene.remove(p.mesh);
+      p.mesh.material.dispose();
+      p.mesh.geometry.dispose();
+      scorchPulses.splice(i, 1);
+      continue;
+    }
+    const t = age / p.duration;
+    const s = 1 + t * 7;
+    p.mesh.scale.set(s, s, s);
+    p.mesh.material.opacity = 0.35 * (1 - t);
+  }
+}
+
+// ---------------------------------------------------------
+// Применение выбранной врождённой магии (вызывается из ui/school_select.js)
+// ---------------------------------------------------------
+function applyInnateSchool(schoolId) {
+  const ability = INNATE_ABILITIES[schoolId];
+  if (!ability) return;
+  state.innateSchool = schoolId;
+  state.innateAbilityId = ability.id;
+
+  // Выдаём способность в инвентарь (пассивный слот 1)
+  equipmentState.passive1 = {
+    id: ability.id,
+    name: ability.name,
+    icon: ability.icon,
+    color: ability.color,
+    innate: true,
+    tooltip: ability.description,
+  };
+
+  // Сброс состояния парного прыжка при смене школы
+  state.airJumpsUsed = 0;
+
+  renderInventoryGrid();
+  updateHUD();
+}
+
+// Экспорт для UI-систем
+window.applyInnateSchool = applyInnateSchool;
+window.hasInnateAbility = hasInnateAbility;
+window.beginGame = beginGame;
+window.gameState = state; // ссылка на состояние для UI-систем (school_select и др.)
+
+// ---------------------------------------------------------
 // Способность: вспышка маны (ПКМ)
 // ---------------------------------------------------------
 function castFlare() {
@@ -714,6 +906,7 @@ function updateNearestPickup() {
 // Игрок: движение, физика, характеристики
 // ---------------------------------------------------------
 function isActive() {
+  if (typeof schoolSelectIsOpen === 'function' && schoolSelectIsOpen()) return false;
   return state.started && !state.paused && !state.inventoryOpen && !state.dead && !cheatConsoleOpen;
 }
 
@@ -763,6 +956,8 @@ function applyFriction(deltaTime) {
 }
 
 function updatePlayer(dt, elapsed) {
+  // Пока открыт экран выбора врождённой магии — игрока не обновляем
+  if (typeof schoolSelectIsOpen === 'function' && schoolSelectIsOpen()) return;
   const forward = new THREE.Vector3(-Math.sin(camera.rotation.y), 0, -Math.cos(camera.rotation.y));
   const right = new THREE.Vector3(Math.cos(camera.rotation.y), 0, -Math.sin(camera.rotation.y));
   let moveX = 0, moveZ = 0;
@@ -790,9 +985,7 @@ function updatePlayer(dt, elapsed) {
     // пропускаем фазу трения этого кадра — накопленная горизонтальная
     // скорость сохраняется, и сразу выдаётся импульс прыжка вверх.
     if (jumpHeld) {
-      state.velocityY = CONFIG.jumpSpeed;
-      state.onGround = false;
-      state.jumpQueued = false;
+      doJump();
     } else {
       // На земле: сначала трение (Friction), уменьшающее velocity,
       // затем accelerate() с обычными высокими параметрами
@@ -854,19 +1047,21 @@ function updatePlayer(dt, elapsed) {
       // этого кадра — горизонтальная скорость сохраняется целиком,
       // и сразу придаётся импульс прыжка вверх.
       if (jumpHeld && impact <= CONFIG.fallDamageThreshold) {
-        state.velocityY = CONFIG.jumpSpeed;
-        newY = CONFIG.eyeHeight;
+        doJump();
         state.onGround = true;
-        state.jumpQueued = false;
+        newY = CONFIG.eyeHeight;
       } else {
         newY = CONFIG.eyeHeight;
         state.velocityY = 0;
         state.onGround = true;
       }
+      // Приземление — сбрасываем счётчик прыжков в воздухе (Parkour)
+      state.airJumpsUsed = 0;
     } else {
       newY = CONFIG.eyeHeight;
       state.velocityY = 0;
       state.onGround = true;
+      state.airJumpsUsed = 0;
     }
   } else {
     state.onGround = false;
@@ -989,6 +1184,15 @@ function fullReset() {
   equipmentState.active2 = null;
   equipmentState.passive1 = null;
   equipmentState.passive2 = null;
+  // Сброс врождённой магии
+  state.innateSchool = null;
+  state.innateAbilityId = null;
+  state.airJumpsUsed = 0;
+  // Убрать активные снаряды/вспышки
+  for (const p of parkourShots) scene.remove(p.mesh);
+  parkourShots.length = 0;
+  for (const p of scorchPulses) scene.remove(p.mesh);
+  scorchPulses.length = 0;
   collectibles.forEach((c) => { c.collected = false; c.mesh.visible = true; });
   resetPlayerPosition();
   state.dead = false;
@@ -1062,7 +1266,9 @@ function checkTargetHit() {
     const target = targets.find(t => t.mesh === hitMesh);
     if (target) {
       // Получаем урон от текущей руки
-      const damage = getHandDamage();
+      let damage = getHandDamage();
+      // Врождённая способность «Ambassador of Luck»: ±10% к любому урону
+      if (typeof rollLuckDamage === 'function') damage = rollLuckDamage(damage);
       // Deal damage and show immediately
       applyDamageToTarget(target, damage);
     }
@@ -1147,9 +1353,11 @@ function onKeyDown(e) {
     // Здесь — мгновенный прыжок, если игрок уже на земле, и запись
     // в буфер ввода (jump-queue) для случаев точного тайинга.
     if (state.onGround) {
-      state.velocityY = CONFIG.jumpSpeed;
-      state.onGround = false;
-      state.jumpQueued = false;
+      doJump();
+    } else if (hasInnateAbility('parkour') && state.airJumpsUsed < 1) {
+      // «Parkour» — двойной прыжок: второй прыжок в воздухе
+      state.airJumpsUsed++;
+      doJump(true);
     } else {
       state.jumpQueued = true;
     }
@@ -1177,26 +1385,19 @@ function bindEvents() {
   // Слушаем сообщения от iframe меню
   window.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'START_GAME') {
-      state.started = true;
-      state.paused = false;
-      menuFrameContainer.classList.add('hidden');
-      hudEl.classList.remove('hidden');
-      resetPlayerPosition();
-      updateHUD();
-      renderInventoryGrid();
-      initHand();
-
-      // ФИКС №1: снимаем фокус с iframe и возвращаем родительскому окну
+      // Снимаем фокус с iframe, затем открываем экран выбора врождённой магии
       if (document.activeElement && document.activeElement.tagName === 'IFRAME') {
-        document.activeElement.blur();
-      }
-      if (menuFrameContainer.contains(document.activeElement)) {
         document.activeElement.blur();
       }
       window.focus();
       container.focus();
-
-      container.requestPointerLock();
+      menuFrameContainer.classList.add('hidden');
+      if (typeof openSchoolSelect === 'function') {
+        // Игра стартует после выбора школы (openSchoolSelect -> beginGame)
+        openSchoolSelect();
+      } else {
+        beginGame();
+      }
     }
   });
 
@@ -1246,6 +1447,9 @@ function animate() {
   } else if (isActive()) {
     updatePlayer(dt, elapsed);
     updateFlares(dt, elapsed);
+    updateParkourShots(dt, elapsed);
+    updateScorchAura(dt);
+    updateScorchPulses(dt, elapsed);
     updateHandAnimation(dt);
     updateHUD();
   }
@@ -1348,6 +1552,21 @@ function executeCheatCommand(cmd) {
       case 'spawn_superbob': {
         spawnTarget('superbob');
         logToConsole('Создан SuperBob (бессмертный)', 'success');
+        break;
+      }
+      case 'innate_fire': {
+        applyInnateSchool('fire');
+        logToConsole('Врождённая магия: Огонь — Scorching Flame', 'success');
+        break;
+      }
+      case 'innate_space': {
+        applyInnateSchool('space');
+        logToConsole('Врождённая магия: Пространство — Parkour', 'success');
+        break;
+      }
+      case 'innate_luck': {
+        applyInnateSchool('luck');
+        logToConsole('Врождённая магия: Удача — Ambassador of Luck', 'success');
         break;
       }
       case 'delall_bob': {
