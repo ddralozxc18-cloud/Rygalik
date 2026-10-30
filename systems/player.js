@@ -10,6 +10,9 @@ function getHandDamage() {
 // Нанести урон игроку
 function damagePlayer(amount, type = 'physical') {
   if (amount <= 0 || state.dead) return;
+
+  // Ambassador of Luck: входящий урон тоже рандомизирован ±10%
+  if (typeof rollLuckDamage === 'function') amount = rollLuckDamage(amount);
   
   // applyArmorMitigation уже внутри использует physicalDamageMult или magicResistMult
   const final = (type === 'true') ? amount : applyArmorMitigation(amount, type);
